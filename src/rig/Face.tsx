@@ -1,0 +1,83 @@
+// Mouth and brows drawn on top of each view's head, in that view's own
+// coordinates (they turn and tilt with the head). Placement was measured on
+// the Illustrator export; back views get nothing.
+import { Mouth, MouthShape } from "../Mouth";
+
+type Pt = [number, number];
+export type FacePose = {
+  mouth: MouthShape;
+  brows: { l: number; r: number }; // px up (negative = frown), screen sides
+};
+
+type Brow = { d: string; pivot: Pt };
+type FaceGeo = {
+  brows: { l?: Brow; r?: Brow };
+  mouth?: { origin: Pt; scale: Pt; skew: number; noseY: number; open: number } | { profile: { front: Pt; corner: Pt } };
+};
+
+const INK = "#111";
+const STROKE = 5;
+
+const FACES: Record<string, FaceGeo> = {
+  "000": {
+    brows: {
+      l: { d: "M362,264 Q395,250 428,258", pivot: [395, 256] },
+      r: { d: "M488,258 Q521,250 554,264", pivot: [521, 256] },
+    },
+    mouth: { origin: [458, 494], scale: [0.72, 0.72], skew: -6, noseY: -43, open: 1.6 },
+  },
+  "045": {
+    brows: {
+      l: { d: "M430,262 Q470,250 512,256", pivot: [471, 255] },
+      r: { d: "M575,258 Q592,252 608,256", pivot: [592, 255] },
+    },
+    mouth: { origin: [601, 492], scale: [0.6, 0.7], skew: -10, noseY: -46, open: 1.6 },
+  },
+  "090": {
+    brows: { r: { d: "M548,258 Q570,248 592,254", pivot: [570, 252] } },
+    mouth: { profile: { front: [703, 463], corner: [657, 478] } },
+  },
+};
+
+// How far the jaw opens in profile, per mouth shape.
+const PROFILE_OPEN: Record<MouthShape, number> = { X: 0, A: 0, B: 11, C: 24, D: 36, E: 24, F: 15, G: 11, H: 24 };
+
+const ProfileMouth: React.FC<{ shape: MouthShape; front: Pt; corner: Pt }> = ({ shape, front, corner }) => {
+  const open = PROFILE_OPEN[shape];
+  if (!open) {
+    return <path d={`M${front[0] - 2},${front[1] + 1} Q${(front[0] + corner[0]) / 2},${front[1] + 8} ${corner}`} />;
+  }
+  const lower: Pt = [front[0] - 3, front[1] + open];
+  return (
+    <path
+      d={`M${front[0] + 1},${front[1] - 1} L${corner} L${lower} Q${front[0] + 2},${lower[1] - open / 2} ${front[0] + 1},${front[1] - 1} Z`}
+      fill="#4a1a1f"
+    />
+  );
+};
+
+export const Face: React.FC<{ view: string; mirror: boolean; pose: FacePose; id: string }> = ({ view, mirror, pose, id }) => {
+  const geo = FACES[view];
+  if (!geo) return null;
+  // In a mirrored view the source's right brow shows on the screen's left.
+  const lift = { l: mirror ? pose.brows.r : pose.brows.l, r: mirror ? pose.brows.l : pose.brows.r };
+  const m = geo.mouth;
+
+  return (
+    <g fill="none" stroke={INK} strokeWidth={STROKE} strokeLinecap="round" strokeLinejoin="round">
+      {(["l", "r"] as const).map((side) => {
+        const b = geo.brows[side];
+        if (!b) return null;
+        const up = lift[side];
+        // Raised brows tilt outward a touch; frowns tilt in.
+        const tilt = (side === "l" ? -1 : 1) * up * 0.5;
+        return <path key={side} d={b.d} transform={`translate(0 ${-up}) rotate(${tilt} ${b.pivot[0]} ${b.pivot[1]})`} />;
+      })}
+      {m && "profile" in m ? (
+        <ProfileMouth shape={pose.mouth} {...m.profile} />
+      ) : m ? (
+        <Mouth shape={pose.mouth} {...m} id={`${id}-mouth`} />
+      ) : null}
+    </g>
+  );
+};
