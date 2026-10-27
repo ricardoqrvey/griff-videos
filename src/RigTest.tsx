@@ -12,9 +12,9 @@ const TURNS: TurnKey[] = [
 ];
 
 const LEFT: ArmKey[] = [
-  { at: s(0.8), pose: { shoulder: 28, elbow: 150, wrist: -10, hand: "index-up" } },
+  { at: s(0.8), pose: { shoulder: 36, elbow: 150, wrist: -10, hand: "index-up" } },
   { at: s(2.2), pose: { shoulder: 0, elbow: 0 } },
-  { at: s(9.6), pose: { shoulder: 24, elbow: 152, wrist: -8, hand: "ok" } },
+  { at: s(9.6), pose: { shoulder: 44, elbow: 140, wrist: -4, hand: "ok" } },
   { at: s(12.2), pose: { shoulder: 0, elbow: 0 } },
 ];
 

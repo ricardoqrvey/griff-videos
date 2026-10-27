@@ -171,9 +171,9 @@ for (const file of readdirSync(dir).sort()) {
 // --- borrowed arms -------------------------------------------------------------
 // The profile arm (rounded shoulder) reads better in every view than the pointed
 // sleeves drawn for the front and back. It's fitted shoulder-to-wrist onto each
-// view's own arm, mirrored on the right so the elbow bends outward, and tucked
-// behind the torso so the vest hides the shoulder joint.
-const BORROW = { from: "090", side: "near", into: ["000", "045", "180"] };
+// view's own arm, mirrored on the left so the elbow bends in toward the body,
+// and tucked behind the torso so the vest hides about half the shoulder cap.
+const BORROW = { from: "090", side: "near", into: ["000", "045", "180"], shoulderIn: 40 };
 
 function fit(src, dst, mirror) {
   // Reflect about the source shoulder, then rotate + scale + translate onto dst.
@@ -196,7 +196,10 @@ const donor = views[BORROW.from].arms[BORROW.side];
 for (const v of BORROW.into) {
   const view = views[v];
   for (const side of Object.keys(view.arms)) {
-    const { matrix, apply, k } = fit(donor, view.arms[side], side === "r");
+    const own = view.arms[side];
+    const inward = Math.sign(view.anchorX - own.shoulder[0]) * BORROW.shoulderIn;
+    const dst = { shoulder: [own.shoulder[0] + inward, own.shoulder[1]], wrist: own.wrist };
+    const { matrix, apply, k } = fit(donor, dst, side === "l");
     const wrap = (markup) => `<g transform="${matrix}">${markup}</g>`;
     view.arms[side] = {
       upper: wrap(donor.upper),

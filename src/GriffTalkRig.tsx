@@ -26,11 +26,11 @@ const TURNS: TurnKey[] = [
 ];
 
 const LEFT: ArmKey[] = [
-  { at: on("build"), pose: { shoulder: 28, elbow: 150, wrist: -10, hand: "index-up" } },
+  { at: on("build"), pose: { shoulder: 36, elbow: 150, wrist: -10, hand: "index-up" } },
   { at: on("sure"), pose: { shoulder: 0, elbow: 0 } },
   { at: on("months"), pose: { shoulder: 22, elbow: 70, hand: "turn-07" } },
   { at: on("drop", 0, -0.3), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("done"), pose: { shoulder: 24, elbow: 152, wrist: -8, hand: "ok" } },
+  { at: on("done"), pose: { shoulder: 44, elbow: 140, wrist: -4, hand: "ok" } },
   { at: on("live"), pose: { shoulder: 0, elbow: 0 } },
 ];
 
