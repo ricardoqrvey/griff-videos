@@ -168,6 +168,55 @@ for (const file of readdirSync(dir).sort()) {
   }
 }
 
+// --- borrowed arms -------------------------------------------------------------
+// The profile arm (rounded shoulder) reads better in every view than the pointed
+// sleeves drawn for the front and back. It's fitted shoulder-to-wrist onto each
+// view's own arm, mirrored on the right so the elbow bends outward, and tucked
+// behind the torso so the vest hides the shoulder joint.
+const BORROW = { from: "090", side: "near", into: ["000", "045", "180"] };
+
+function fit(src, dst, mirror) {
+  // Reflect about the source shoulder, then rotate + scale + translate onto dst.
+  const m = mirror ? [-1, 0, 0, 1, 2 * src.shoulder[0], 0] : [1, 0, 0, 1, 0, 0];
+  const ap = (p) => [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]];
+  const s0 = ap(src.shoulder), s1 = ap(src.wrist);
+  const k = Math.hypot(dst.wrist[0] - dst.shoulder[0], dst.wrist[1] - dst.shoulder[1]) / Math.hypot(s1[0] - s0[0], s1[1] - s0[1]);
+  const a = Math.atan2(dst.wrist[1] - dst.shoulder[1], dst.wrist[0] - dst.shoulder[0]) - Math.atan2(s1[1] - s0[1], s1[0] - s0[0]);
+  const [c, s] = [k * Math.cos(a), k * Math.sin(a)];
+  // q = R·(m·p − s0) + dst.shoulder, as one matrix
+  const r = [c * m[0] - s * m[1], s * m[0] + c * m[1], c * m[2] - s * m[3], s * m[2] + c * m[3]];
+  const tx = c * (m[4] - s0[0]) - s * (m[5] - s0[1]) + dst.shoulder[0];
+  const ty = s * (m[4] - s0[0]) + c * (m[5] - s0[1]) + dst.shoulder[1];
+  const mat = [...r, tx, ty];
+  const apply = (p) => pt(mat[0] * p[0] + mat[2] * p[1] + mat[4], mat[1] * p[0] + mat[3] * p[1] + mat[5]);
+  return { matrix: `matrix(${mat.map((v) => Math.round(v * 1000) / 1000).join(" ")})`, apply, k };
+}
+
+const donor = views[BORROW.from].arms[BORROW.side];
+for (const v of BORROW.into) {
+  const view = views[v];
+  for (const side of Object.keys(view.arms)) {
+    const { matrix, apply, k } = fit(donor, view.arms[side], side === "r");
+    const wrap = (markup) => `<g transform="${matrix}">${markup}</g>`;
+    view.arms[side] = {
+      upper: wrap(donor.upper),
+      lower: wrap(donor.lower),
+      upperFill: wrap(donor.upperFill),
+      lowerFill: wrap(donor.lowerFill),
+      elbow: apply(donor.elbow),
+      wrist: apply(donor.wrist),
+      patch: round(donor.patch * k),
+      shoulder: apply(donor.shoulder),
+    };
+  }
+  // Arms (and the hands drawn with them) go right under the torso.
+  const torsoAt = view.order.indexOf("torso");
+  const arms = view.order.filter((n, i) => n.startsWith("arm-") && i > torsoAt);
+  const rest = view.order.filter((n) => !arms.includes(n));
+  rest.splice(rest.indexOf("torso"), 0, ...arms);
+  view.order = rest;
+}
+
 writeFileSync(outFile, JSON.stringify({ views, hands }));
 for (const [k, v] of Object.entries(views)) {
   console.log(k, v.order.join(" "), JSON.stringify(Object.fromEntries(Object.entries(v.arms).map(([s, a]) => [s, { sh: a.shoulder, el: a.elbow, wr: a.wrist }]))));
