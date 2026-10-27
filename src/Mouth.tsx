@@ -34,6 +34,7 @@ type MouthProps = {
   shape: MouthShape;
   origin?: Pt; // where the local frame sits on the face
   noseY?: number; // philtrum start, in local units
+  noseX?: number; // philtrum top x, for faces turned away (the line then slants)
   scale?: Pt;
   skew?: number; // negative lifts the right corner (Griff's smirk)
   chin?: boolean;
@@ -45,6 +46,7 @@ export const Mouth: React.FC<MouthProps> = ({
   shape,
   origin = ORIGIN,
   noseY = NOSE_Y,
+  noseX = 0,
   scale = [1, 1],
   skew = -14,
   chin = true,
@@ -97,7 +99,7 @@ export const Mouth: React.FC<MouthProps> = ({
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <line x1={0} y1={noseY} x2={0} y2={topLip} />
+      <line x1={noseX} y1={noseY} x2={0} y2={topLip} />
       {body}
       {chin && <Chin drop={drop} />}
     </g>

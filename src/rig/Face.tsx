@@ -12,7 +12,7 @@ export type FacePose = {
 type Brow = { d: string; pivot: Pt };
 type FaceGeo = {
   brows: { l?: Brow; r?: Brow };
-  mouth?: { origin: Pt; scale: Pt; skew: number; noseY: number; open: number } | { profile: { front: Pt; corner: Pt } };
+  mouth?: { origin: Pt; scale: Pt; skew: number; noseX?: number; noseY: number; open: number } | { profile: { front: Pt; corner: Pt } };
 };
 
 const INK = "#111";
@@ -31,7 +31,7 @@ const FACES: Record<string, FaceGeo> = {
       l: { d: "M430,262 Q470,250 512,256", pivot: [471, 255] },
       r: { d: "M575,258 Q592,252 608,256", pivot: [592, 255] },
     },
-    mouth: { origin: [601, 492], scale: [0.6, 0.7], skew: -10, noseY: -46, open: 1.6 },
+    mouth: { origin: [590, 494], scale: [0.74, 0.8], skew: -10, noseX: 15, noseY: -42, open: 1.6 },
   },
   "090": {
     brows: { r: { d: "M548,258 Q570,248 592,254", pivot: [570, 252] } },
