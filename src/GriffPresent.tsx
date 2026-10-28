@@ -18,16 +18,16 @@ const LOW = { shoulder: 4, elbow: 112 };
 const UP = { shoulder: 6, elbow: 128 };
 // Forearm out to the side at hip height: the shrug.
 const SHRUG = { shoulder: 2, elbow: 32 };
-// The open "grab" hand is drawn thumb-out for this pose; mirrored, the thumb
-// faces the body and the little finger the camera, as it should.
-const OPEN = (wrist = 18) => ({ ...LOW, wrist, hand: "grab", mirrorHand: true });
+// Open palm toward the camera, thumb out: the presenting hand.
+const PALM = "turn-03";
+const OPEN = (wrist = 18) => ({ ...LOW, wrist, hand: PALM });
 const show = (hand: string, wrist = 18, pose = UP) => ({ ...pose, wrist, hand });
 
 const key = (sec: number, pose: ArmPose): ArmKey => ({ at: f(sec), pose });
 
 // Screen-left arm (Griff's right hand).
 const LEFT: ArmKey[] = [
-  key(w("good"), { ...SHRUG, wrist: 10, hand: "grab", mirrorHand: true }),
+  key(w("good"), { ...SHRUG, wrist: 10, hand: PALM }),
   key(w("that") + 0.4, REST),
   key(w("build"), show("index-up")),
   key(w("sure"), REST),
@@ -52,7 +52,7 @@ const RIGHT: ArmKey[] = [
   key(w("baked"), OPEN(32)),
   key(w("app"), OPEN(18)),
   key(w("adorable"), REST),
-  key(w("good"), { ...SHRUG, wrist: 10, hand: "grab", mirrorHand: true }),
+  key(w("good"), { ...SHRUG, wrist: 10, hand: PALM }),
   key(w("that") + 0.4, REST),
   key(w("got"), OPEN(8)),
   key(w("dashboards") - 0.1, REST),

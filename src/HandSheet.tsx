@@ -10,9 +10,9 @@ const FOCUS = [110, 420]; // around the raised screen-left hand, in stage units
 
 export const HAND_SHEET_SIZE = { width: COLS * CELL, height: Math.ceil(SHAPES.length / COLS) * CELL };
 
-export const HandSheet: React.FC = () => (
+export const HandSheet: React.FC<{ hands?: string[]; elbow?: number }> = ({ hands = SHAPES, elbow = 128 }) => (
   <AbsoluteFill style={{ background: "#555" }}>
-    {SHAPES.map((hand, i) => (
+    {hands.map((hand, i) => (
       <div
         key={hand}
         style={{ position: "absolute", left: (i % COLS) * CELL, top: Math.floor(i / COLS) * CELL, width: CELL, height: CELL, overflow: "hidden" }}
@@ -26,7 +26,7 @@ export const HandSheet: React.FC = () => (
             height: 1764 * ZOOM,
           }}
         >
-          <Rig id={`hs-${i}`} pose={{ view: "000", arms: { l: { shoulder: 6, elbow: 128, wrist: 18, hand } } }} />
+          <Rig id={`hs-${i}`} pose={{ view: "000", arms: { l: { shoulder: 6, elbow, wrist: 18, hand } } }} />
         </div>
         <div style={{ position: "absolute", left: 6, top: 4, font: "bold 18px sans-serif", color: "#fff" }}>{hand}</div>
       </div>
