@@ -17,6 +17,7 @@ type ArmData = {
   handFix?: string; // moves a view's own hand onto a borrowed arm's wrist
   handTurn?: number; // and the angle that hand was turned by, for library hands
   swingIn?: boolean; // in front of the torso: the elbow bends across the body
+  forearmLean: number; // forearm direction at rest, degrees from straight down
 };
 type ViewData = {
   w: number;
@@ -29,7 +30,16 @@ type ViewData = {
   ground: number;
   handHeight: number;
 };
-type HandData = { w: number; h: number; markup: string; wrist: Pt; dir: "down" | "up" | "left" | "right"; height: number };
+type HandData = {
+  w: number;
+  h: number;
+  markup: string;
+  wrist: Pt;
+  axis: Pt; // wrist to palm centre, as drawn
+  left: boolean; // drawn as a left hand
+  dir: "down" | "up" | "left" | "right";
+  height: number;
+};
 
 const RIG = rigData as unknown as { views: Record<string, ViewData>; hands: Record<string, HandData> };
 
@@ -107,14 +117,16 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
   const libHand = (side: string, a: ArmData, p: ArmPose) => {
     const hand = RIG.hands[p.hand!];
     const scale = view.handHeight / RIG.hands["turn-01"].height;
-    // Library hands are drawn as the screen-left hand of the front view.
-    const flip = (side === "r") !== !!p.mirrorHand ? -1 : 1;
-    // Turn each hand so it points along the forearm (down at rest).
-    const turn = { down: 0, up: 180, left: 90, right: -90 }[hand.dir];
+    // Thumb on the correct side: the screen-left arm is Griff's right hand, so
+    // left-hand drawings (and every hand on the right arm) are mirrored.
+    const flip = (side === "r") !== hand.left !== !!p.mirrorHand ? -1 : 1;
+    // Lay the hand's own axis exactly along the forearm.
+    const lean = (x: number, y: number) => (Math.atan2(x, y) * 180) / Math.PI;
+    const turn = lean(flip * hand.axis[0], hand.axis[1]) - a.forearmLean;
     return (
       <Svg
         markup={hand.markup}
-        transform={`translate(${a.wrist[0]} ${a.wrist[1]}) rotate(${(a.handTurn ?? 0) + turn}) scale(${flip * scale} ${scale}) translate(${-hand.wrist[0]} ${-hand.wrist[1]})`}
+        transform={`translate(${a.wrist[0]} ${a.wrist[1]}) rotate(${turn}) scale(${flip * scale} ${scale}) translate(${-hand.wrist[0]} ${-hand.wrist[1]})`}
       />
     );
   };

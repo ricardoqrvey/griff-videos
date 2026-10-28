@@ -18,28 +18,30 @@ const LOW = { shoulder: 4, elbow: 112 };
 const UP = { shoulder: 6, elbow: 128 };
 // Forearm out to the side at hip height: the shrug.
 const SHRUG = { shoulder: 2, elbow: 32 };
-// Open palm toward the camera, thumb out: the presenting hand.
+// Open palm toward the camera: the presenting hand.
 const PALM = "turn-03";
-const OPEN = (wrist = 18) => ({ ...LOW, wrist, hand: PALM });
-const show = (hand: string, wrist = 18, pose = UP) => ({ ...pose, wrist, hand });
+// The wrist never bends away from the forearm; emphasis comes from the elbow.
+// `lift` raises (+) or drops (−) the forearm a few degrees from the base pose.
+const OPEN = (lift = 0) => ({ ...LOW, elbow: LOW.elbow + lift, hand: PALM });
+const show = (hand: string, lift = 0, pose = UP) => ({ ...pose, elbow: pose.elbow + lift, hand });
 
 const key = (sec: number, pose: ArmPose): ArmKey => ({ at: f(sec), pose });
 
 // Screen-left arm (Griff's right hand).
 const LEFT: ArmKey[] = [
-  key(w("good"), { ...SHRUG, wrist: 10, hand: PALM }),
+  key(w("good"), { ...SHRUG, hand: PALM }),
   key(w("that") + 0.4, REST),
   key(w("build"), show("index-up")),
   key(w("sure"), REST),
   key(w("dashboards") - 0.1, show("index-up")),
   key(w("multi-tenant"), show("peace")),
   key(w("maintenance"), show("three")),
-  key(w("until"), show("three", 38)),
+  key(w("until"), show("three", -12)),
   key(w("or"), REST),
   key(w("done") - 0.1, show("ok")),
   key(w("nonsense"), REST),
   key(w("embedded"), OPEN()),
-  key(w("herd"), OPEN(34)),
+  key(w("herd"), OPEN(10)),
   key(w("engineers"), REST),
   key(w("goatiq", 1) - 0.1, show("rock")),
   key(w("ai-powered"), REST),
@@ -49,26 +51,27 @@ const LEFT: ArmKey[] = [
 // Screen-right arm (Griff's left hand).
 const RIGHT: ArmKey[] = [
   key(w("your") - 0.1, OPEN()),
-  key(w("baked"), OPEN(32)),
-  key(w("app"), OPEN(18)),
+  key(w("baked"), OPEN(8)),
+  key(w("app"), OPEN()),
   key(w("adorable"), REST),
-  key(w("good"), { ...SHRUG, wrist: 10, hand: PALM }),
+  key(w("good"), { ...SHRUG, hand: PALM }),
   key(w("that") + 0.4, REST),
-  key(w("got"), OPEN(8)),
+  key(w("got"), OPEN(-8)),
   key(w("dashboards") - 0.1, REST),
-  key(w("drop"), OPEN(10)),
+  key(w("drop"), OPEN(-6)),
   key(w("goatiq") - 0.05, show("index-up")),
-  key(w("plug"), { ...LOW, wrist: 10, hand: "fist" }),
-  key(w("embed"), OPEN(26)),
-  key(w("let"), { ...LOW, wrist: 18, hand: "index-up" }),
-  key(w("poke"), { ...LOW, wrist: 30, hand: "index-up" }),
-  key(w("around"), { ...LOW, wrist: 10, hand: "index-up" }),
+  key(w("plug"), { ...LOW, hand: "fist" }),
+  key(w("embed"), OPEN(6)),
+  key(w("let"), { ...LOW, hand: "index-up" }),
+  // "poke around": two small jabs of the forearm.
+  key(w("poke"), { ...LOW, elbow: LOW.elbow + 8, hand: "index-up" }),
+  key(w("around"), { ...LOW, elbow: LOW.elbow - 4, hand: "index-up" }),
   key(w("themselves"), REST),
   key(w("live"), show("index-up")),
-  // "not next quarter": a finger wag.
-  key(w("not"), show("index-up", 34)),
-  key(w("next"), show("index-up", 6)),
-  key(w("quarter"), show("index-up", 34)),
+  // "not next quarter": the finger wags with the forearm, not the wrist.
+  key(w("not"), show("index-up", 10)),
+  key(w("next"), show("index-up", -8)),
+  key(w("quarter"), show("index-up", 10)),
   key(w("embedded"), REST),
   key(w("30"), show("three")),
   key(w("no", 2), REST),
@@ -108,8 +111,8 @@ const faceAt = (t: number): Face => {
   return { l: mix(prev.l, cur.l), r: mix(prev.r, cur.r), tilt: mix(prev.tilt, cur.tilt), nod: mix(prev.nod, cur.nod) };
 };
 
-// A slow drift in the wrists so the hands never freeze.
-const idle = (p: ArmPose, t: number, phase: number): ArmPose => ({ ...p, wrist: (p.wrist ?? 0) + Math.sin(t * 1.7 + phase) * 2.5 });
+// A slow drift at the elbow so the arms never freeze (the wrist stays straight).
+const idle = (p: ArmPose, t: number, phase: number): ArmPose => ({ ...p, elbow: p.elbow + Math.sin(t * 1.1 + phase) * 1.5 });
 
 export const GRIFF_PRESENT_FRAMES = Math.ceil(36.48 * FPS);
 

@@ -183,11 +183,23 @@ for (const file of readdirSync(dir).sort()) {
       left: [b.minX + 14, meanY],
       right: [b.maxX - 14, meanY],
     }[dir];
+    // Axis of the hand as drawn: wrist to the middle of the palm (the part
+    // nearest the wrist, before the fingers), so the rig can lay it exactly
+    // along the forearm instead of trusting the drawing to be straight.
+    const len = dir === "left" || dir === "right" ? b.maxX - b.minX : b.maxY - b.minY;
+    const palm = P.filter((p) => {
+      const d = { down: p[1] - b.minY, up: b.maxY - p[1], left: p[0] - b.minX, right: b.maxX - p[0] }[dir];
+      return d > 0.1 * len && d < 0.45 * len;
+    });
+    const centre = [meanX(palm), palm.reduce((sum, p) => sum + p[1], 0) / palm.length];
     hands[name] = {
       w: round(w),
       h: round(h),
       markup: markup(root.querySelector("svg")),
       wrist: pt(...wrist),
+      axis: pt(centre[0] - wrist[0], centre[1] - wrist[1]),
+      // Gesture hands are drawn as right hands; the rest (turn) series as left hands.
+      left: name.startsWith("turn-"),
       dir,
       height: round(dir === "left" || dir === "right" ? b.maxX - b.minX : b.maxY - b.minY),
     };
@@ -268,6 +280,9 @@ for (const v of BORROW.into) {
   rest.splice(rest.indexOf("torso"), 0, ...arms);
   view.order = rest;
 }
+
+// Forearm direction at rest, which library hands are laid along.
+for (const view of Object.values(views)) for (const a of Object.values(view.arms)) a.forearmLean = round(lean(a.elbow, a.wrist));
 
 writeFileSync(outFile, JSON.stringify({ views, hands }));
 for (const [k, v] of Object.entries(views)) {
