@@ -29,7 +29,7 @@ type ViewData = {
   ground: number;
   handHeight: number;
 };
-type HandData = { w: number; h: number; markup: string; wrist: Pt; dir: "down" | "up"; height: number };
+type HandData = { w: number; h: number; markup: string; wrist: Pt; dir: "down" | "up" | "left" | "right"; height: number };
 
 const RIG = rigData as unknown as { views: Record<string, ViewData>; hands: Record<string, HandData> };
 
@@ -109,7 +109,8 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const scale = view.handHeight / RIG.hands["turn-01"].height;
     // Library hands are drawn as the screen-left hand of the front view.
     const flip = (side === "r") !== !!p.mirrorHand ? -1 : 1;
-    const turn = hand.dir === "up" ? 180 : 0;
+    // Turn each hand so it points along the forearm (down at rest).
+    const turn = { down: 0, up: 180, left: 90, right: -90 }[hand.dir];
     return (
       <Svg
         markup={hand.markup}

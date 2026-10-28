@@ -100,6 +100,9 @@ lienzo, para que caigan justo sobre la cabeza.
 Las poses (señalar, encogerse de hombros, levantar el índice) son ángulos en código: el hombro y el
 codo rotan, y la mano cambia por la forma que pida el gesto. Lo que hace falta es esto:
 
+- **Ángulos con Turntable:** cada forma se exporta como `hand_<forma>_<ángulo>` (por ejemplo `hand_peace_045`),
+  con el ángulo de Turntable en tres dígitos; 000 es la palma de frente y 180 el dorso. Un script nombra
+  artboards y vistas a partir del nombre que deja Turntable, así que basta con colocar cada vista en su artboard.
 - **Biblioteca de manos** con nombres de forma: `fist`, `index-up`, `peace`, `three`, `rock`, `ok`,
   `relaxed`, `point` (señalando a cámara), `open-palm`. Las manos en reposo vistas desde distintos ángulos van como
   `relaxed_000`, `relaxed_045`, etc.

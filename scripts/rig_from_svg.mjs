@@ -13,6 +13,8 @@ import { svgPathProperties } from "svg-path-properties";
 const [dir, outFile] = process.argv.slice(2);
 const VIEW_RE = /^griff_(\d{3})\.svg$/;
 const HAND_RE = /^hand_(.+)\.svg$/;
+// Hand views drawn lying on their side: which edge the wrist is on.
+const SIDEWAYS = { "thumbs-up_000": "left", "thumbs-up_045": "left", "thumbs-up_180": "right" };
 
 // --- geometry ---------------------------------------------------------------
 
@@ -161,17 +163,35 @@ for (const file of readdirSync(dir).sort()) {
     const { root, w, h } = readSvg(file);
     const P = pts(root);
     const b = bbox(P);
-    // Turntable hands hang down (wrist on top); gesture hands point up (wrist at the bottom).
-    const dir = hm[1].startsWith("turn-") ? "down" : "up";
-    const edge = dir === "down" ? P.filter((p) => p[1] < b.minY + 12) : P.filter((p) => p[1] > b.maxY - 12);
-    hands[hm[1]] = {
+    // Gesture hands are named hand_<shape>_<angle> (Turntable angle around the
+    // wrist axis); the _000 view also answers to the bare shape name.
+    const name = hm[1];
+    const [, shape, angle] = name.match(/^(.+?)(?:_(\d{3}))?$/);
+    // Rest hands hang down (wrist on top); gesture hands point up (wrist at the bottom),
+    // except a few views drawn sideways with the wrist on one side.
+    const dir = name.startsWith("turn-") ? "down" : SIDEWAYS[name] ?? "up";
+    const edge = {
+      down: P.filter((p) => p[1] < b.minY + 12),
+      up: P.filter((p) => p[1] > b.maxY - 12),
+      left: P.filter((p) => p[0] < b.minX + 12),
+      right: P.filter((p) => p[0] > b.maxX - 12),
+    }[dir];
+    const meanY = edge.reduce((s, p) => s + p[1], 0) / edge.length;
+    const wrist = {
+      down: [meanX(edge), b.minY + 14],
+      up: [meanX(edge), b.maxY - 14],
+      left: [b.minX + 14, meanY],
+      right: [b.maxX - 14, meanY],
+    }[dir];
+    hands[name] = {
       w: round(w),
       h: round(h),
       markup: markup(root.querySelector("svg")),
-      wrist: pt(meanX(edge), dir === "down" ? b.minY + 14 : b.maxY - 14),
+      wrist: pt(...wrist),
       dir,
-      height: round(b.maxY - b.minY),
+      height: round(dir === "left" || dir === "right" ? b.maxX - b.minX : b.maxY - b.minY),
     };
+    if (angle === "000") hands[shape] = hands[name];
   }
 }
 
