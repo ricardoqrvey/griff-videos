@@ -54,6 +54,22 @@ function bbox(points) {
 }
 
 const meanX = (points) => points.reduce((s, p) => s + p[0], 0) / points.length;
+
+// Centre of the far end of a limb, measured along its axis: the points within
+// `depth` of the end, split across the axis, and the middle of their extent.
+// (Taking the lowest points instead picks one corner of a slanted cuff.)
+function endCentre(points, from, toward, depth = 12, inset = 16) {
+  const len0 = Math.hypot(toward[0] - from[0], toward[1] - from[1]);
+  const u = [(toward[0] - from[0]) / len0, (toward[1] - from[1]) / len0];
+  const n = [-u[1], u[0]];
+  const along = (p) => (p[0] - from[0]) * u[0] + (p[1] - from[1]) * u[1];
+  const across = (p) => (p[0] - from[0]) * n[0] + (p[1] - from[1]) * n[1];
+  const far = Math.max(...points.map(along));
+  const edge = points.filter((p) => along(p) > far - depth).map(across);
+  const mid = (Math.max(...edge) + Math.min(...edge)) / 2;
+  const d = far - inset;
+  return [from[0] + u[0] * d + n[0] * mid, from[1] + u[1] * d + n[1] * mid];
+}
 const round = (v) => Math.round(v * 10) / 10;
 const pt = (x, y) => [round(x), round(y)];
 
@@ -101,7 +117,7 @@ function arm(group) {
   const uTop = U.find((p) => p[1] === ub.minY);
   const elbow = [(uBottom[0] + lTop[0]) / 2, (uBottom[1] + lTop[1]) / 2];
   const cuff = L.filter((p) => p[1] > lb.maxY - 12);
-  const wrist = [meanX(cuff), lb.maxY - 18];
+  const wrist = endCentre(L, elbow, [meanX(cuff), lb.maxY], 12, 18);
   const atElbow = U.filter((p) => Math.abs(p[1] - elbow[1]) < 10);
   const half = atElbow.length ? (Math.max(...atElbow.map((p) => p[0])) - Math.min(...atElbow.map((p) => p[0]))) / 2 : 60;
   // Centre of the rounded shoulder: a circle as wide as the sleeve just below its top.
@@ -192,6 +208,10 @@ for (const file of readdirSync(dir).sort()) {
       return d > 0.1 * len && d < 0.45 * len;
     });
     const centre = [meanX(palm), palm.reduce((sum, p) => sum + p[1], 0) / palm.length];
+    // Re-centre the wrist across the hand's own axis (the cut may be slanted).
+    const w2 = endCentre(P, centre, wrist, 12, 14);
+    wrist[0] = w2[0];
+    wrist[1] = w2[1];
     hands[name] = {
       w: round(w),
       h: round(h),

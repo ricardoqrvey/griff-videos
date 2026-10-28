@@ -27,54 +27,49 @@ const show = (hand: string, lift = 0, pose = UP) => ({ ...pose, elbow: pose.elbo
 
 const key = (sec: number, pose: ArmPose): ArmKey => ({ at: f(sec), pose });
 
-// Screen-left arm (Griff's right hand).
+// Arms at rest, or rest with the arm opened a few degrees from the shoulder.
+const EASE: ArmPose = { shoulder: 6, elbow: 0 };
+
+// One arm carries each idea; the other stays down. Holds over changes.
+// Screen-left arm (Griff's right hand): the question, the count, "Done".
 const LEFT: ArmKey[] = [
+  key(w("adorable"), EASE),
   key(w("good"), { ...SHRUG, hand: PALM }),
   key(w("that") + 0.4, REST),
   key(w("build"), show("index-up")),
-  key(w("sure"), REST),
+  key(w("sure"), EASE),
   key(w("dashboards") - 0.1, show("index-up")),
   key(w("multi-tenant"), show("peace")),
   key(w("maintenance"), show("three")),
   key(w("until"), show("three", -12)),
   key(w("or"), REST),
   key(w("done") - 0.1, show("ok")),
-  key(w("nonsense"), REST),
-  key(w("embedded"), OPEN()),
-  key(w("herd"), OPEN(10)),
-  key(w("engineers"), REST),
-  key(w("goatiq", 1) - 0.1, show("rock")),
-  key(w("ai-powered"), REST),
+  key(w("nonsense"), EASE),
+  key(w("live"), REST),
   key(w("embedded", 1), OPEN()),
 ];
 
-// Screen-right arm (Griff's left hand).
+// Screen-right arm (Griff's left hand): the introduction, the GOAT IQ steps,
+// and the closing run from "Live this afternoon" to the name.
 const RIGHT: ArmKey[] = [
   key(w("your") - 0.1, OPEN()),
   key(w("baked"), OPEN(8)),
   key(w("app"), OPEN()),
-  key(w("adorable"), REST),
+  key(w("adorable"), EASE),
   key(w("good"), { ...SHRUG, hand: PALM }),
   key(w("that") + 0.4, REST),
-  key(w("got"), OPEN(-8)),
-  key(w("dashboards") - 0.1, REST),
   key(w("drop"), OPEN(-6)),
   key(w("goatiq") - 0.05, show("index-up")),
   key(w("plug"), { ...LOW, hand: "fist" }),
   key(w("embed"), OPEN(6)),
   key(w("let"), { ...LOW, hand: "index-up" }),
-  // "poke around": two small jabs of the forearm.
-  key(w("poke"), { ...LOW, elbow: LOW.elbow + 8, hand: "index-up" }),
-  key(w("around"), { ...LOW, elbow: LOW.elbow - 4, hand: "index-up" }),
-  key(w("themselves"), REST),
+  key(w("themselves"), EASE),
   key(w("live"), show("index-up")),
-  // "not next quarter": the finger wags with the forearm, not the wrist.
-  key(w("not"), show("index-up", 10)),
-  key(w("next"), show("index-up", -8)),
-  key(w("quarter"), show("index-up", 10)),
-  key(w("embedded"), REST),
+  key(w("not"), show("index-up", 6)),
+  key(w("embedded"), { ...LOW, hand: "index-up" }),
   key(w("30"), show("three")),
-  key(w("no", 2), REST),
+  key(w("no", 2), { ...LOW, hand: "fist" }),
+  key(w("goatiq", 1) - 0.1, show("rock")),
   key(w("embedded", 1), OPEN()),
 ];
 
@@ -111,8 +106,12 @@ const faceAt = (t: number): Face => {
   return { l: mix(prev.l, cur.l), r: mix(prev.r, cur.r), tilt: mix(prev.tilt, cur.tilt), nod: mix(prev.nod, cur.nod) };
 };
 
-// A slow drift at the elbow so the arms never freeze (the wrist stays straight).
-const idle = (p: ArmPose, t: number, phase: number): ArmPose => ({ ...p, elbow: p.elbow + Math.sin(t * 1.1 + phase) * 1.5 });
+// A slow drift at shoulder and elbow so the arms never freeze (the wrist stays straight).
+const idle = (p: ArmPose, t: number, phase: number): ArmPose => ({
+  ...p,
+  shoulder: p.shoulder + Math.sin(t * 0.7 + phase) * 1.2,
+  elbow: p.elbow + Math.sin(t * 1.1 + phase) * 1.5,
+});
 
 export const GRIFF_PRESENT_FRAMES = Math.ceil(36.48 * FPS);
 
