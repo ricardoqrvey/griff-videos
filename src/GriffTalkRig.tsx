@@ -2,6 +2,7 @@ import { AbsoluteFill, Audio, staticFile, useCurrentFrame, useVideoConfig } from
 import { BEATS, CHUNKS, envelope, isQuestion, OPENNESS, shapeAt, SHOTS, WORDS } from "./performance";
 import { Rig, STAGE_H, STAGE_W } from "./rig/Rig";
 import { ArmKey, armAt, TurnKey, viewAt } from "./rig/timeline";
+import type { ArmPose } from "./rig/Rig";
 
 // Griff_1's audio performed by the Illustrator rig: lipsync and brows come
 // from the audio; turns and gestures are cued on words.
@@ -25,29 +26,46 @@ const TURNS: TurnKey[] = [
   { at: on("ai-powered", 0, -0.2), to: "000", dir: "ccw" },
 ];
 
+// Griff is relaxed: most beats are just the hands turning or the wrists
+// flicking. For the few signature gestures the forearm comes forward (toward
+// the camera) rather than up, and the shoulders all but stay still.
 const LEFT: ArmKey[] = [
-  { at: on("build"), pose: { shoulder: 36, elbow: 150, wrist: -10, hand: "index-up" } },
-  { at: on("sure"), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("months"), pose: { shoulder: 22, elbow: 70, hand: "turn-07" } },
+  { at: on("your"), pose: { shoulder: 0, elbow: 0, wrist: 6, hand: "turn-02" } },
+  { at: on("build"), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: 0, hand: "index-up" } },
+  { at: on("sure"), pose: { shoulder: 0, elbow: 0, wrist: -4, hand: "turn-02" } },
+  { at: on("months"), pose: { shoulder: 0, elbow: 0, wrist: 8, hand: "turn-03" } },
   { at: on("drop", 0, -0.3), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("done"), pose: { shoulder: 44, elbow: 140, wrist: -4, hand: "ok" } },
-  { at: on("live"), pose: { shoulder: 0, elbow: 0 } },
+  { at: on("done"), pose: { shoulder: 2, elbow: -20, forward: 1, wrist: -5, hand: "ok" } },
+  { at: on("nonsense"), pose: { shoulder: 0, elbow: 0 } },
+  { at: on("live"), pose: { shoulder: 0, elbow: 0, wrist: 5, hand: "turn-02" } },
+  { at: on("excuses"), pose: { shoulder: 0, elbow: 0 } },
 ];
 
 const RIGHT: ArmKey[] = [
-  { at: on("months"), pose: { shoulder: 22, elbow: 70, hand: "turn-07" } },
+  { at: on("adorable"), pose: { shoulder: 0, elbow: 0, wrist: -6, hand: "turn-02" } },
+  { at: on("good"), pose: { shoulder: 0, elbow: 0, wrist: 6, hand: "turn-02" } },
+  { at: on("months"), pose: { shoulder: 0, elbow: 0, wrist: -8, hand: "turn-03" } },
   { at: on("drop", 0, -0.3), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("live"), pose: { shoulder: 35, elbow: 125, hand: "peace" } },
+  { at: on("live"), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: 0, hand: "peace" } },
+  { at: on("afternoon"), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: 12, hand: "peace" } },
+  { at: on("quarter"), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: -8, hand: "peace" } },
   { at: on("minus"), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("ai-powered"), pose: { shoulder: 30, elbow: 140, hand: "rock" } },
+  { at: on("ai-powered"), pose: { shoulder: 2, elbow: -20, forward: 1, wrist: 0, hand: "rock" } },
 ];
 
 const NEAR: ArmKey[] = [
-  { at: on("drop"), pose: { shoulder: 70, elbow: 15, hand: "index-up" } },
+  { at: on("drop"), pose: { shoulder: 15, elbow: 70, wrist: -10, hand: "index-up" } },
   { at: on("plug", 0, -0.2), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("excuses"), pose: { shoulder: 55, elbow: 95, hand: "fist" } },
+  { at: on("excuses"), pose: { shoulder: 0, elbow: 0, wrist: 8, hand: "turn-05" } },
   { at: on("ai-powered", 0, -0.3), pose: { shoulder: 0, elbow: 0 } },
 ];
+
+// A slow drift in the wrists and elbows so the hands never freeze.
+const idle = (p: ArmPose, t: number, phase: number): ArmPose => ({
+  ...p,
+  elbow: p.elbow + Math.sin(t * 0.9 + phase) * 2,
+  wrist: (p.wrist ?? 0) + Math.sin(t * 1.7 + phase) * 3,
+});
 
 export const GRIFF_TALK_RIG_FRAMES = Math.ceil(36.48 * FPS);
 
@@ -75,8 +93,12 @@ export const GriffTalkRig: React.FC = () => {
   const pose = {
     view: viewAt(frame, "000", TURNS),
     headView: viewAt(frame + 1, "000", TURNS),
-    arms: { l: armAt(frame, fps, LEFT), r: armAt(frame, fps, RIGHT), near: armAt(frame, fps, NEAR) },
-    head: { nod: -open * 5 + Math.sin(t * 2.1) * 1.5, tilt: Math.sin(t * 0.8) * 1.2 },
+    arms: {
+      l: idle(armAt(frame, fps, LEFT), t, 0),
+      r: idle(armAt(frame, fps, RIGHT), t, 2),
+      near: idle(armAt(frame, fps, NEAR), t, 4),
+    },
+    head: { nod: -open * 3 + Math.sin(t * 2.1), tilt: Math.sin(t * 0.8) * 0.8 },
     face: { mouth: shapeAt(t), brows: { l: browL, r: browR } },
   };
 
@@ -123,7 +145,7 @@ export const GriffTalkRig: React.FC = () => {
         <div
           style={{
             position: "absolute",
-            top: close ? 1560 : 230,
+            top: 230,
             width: "100%",
             padding: "0 60px",
             textAlign: "center",

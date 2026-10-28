@@ -14,6 +14,7 @@ type ArmData = {
   elbow: Pt;
   wrist: Pt;
   patch: number;
+  handFix?: string; // moves a view's own hand onto a borrowed arm's wrist
 };
 type ViewData = {
   w: number;
@@ -47,8 +48,17 @@ const SOURCE: Record<View, { src: string; mirror: boolean }> = {
 export const HANDS = Object.keys(RIG.hands);
 
 /** Angles in degrees. shoulder: raise (outward in front/back views, forward in profile).
- *  elbow: bend, positive swings the forearm up on the outside (hand beside the head). wrist: extra tilt of the hand. */
-export type ArmPose = { shoulder: number; elbow: number; wrist?: number; hand?: string; mirrorHand?: boolean };
+ *  elbow: bend, positive swings the forearm up on the outside (hand beside the head). wrist: extra tilt of the hand.
+ *  forward: 0..1, the forearm coming toward the camera: it foreshortens, crosses in front of the
+ *  body, and gesture hands turn fingers-up. The relaxed way to "raise" a hand in front views. */
+export type ArmPose = {
+  shoulder: number;
+  elbow: number;
+  wrist?: number;
+  forward?: number;
+  hand?: string;
+  mirrorHand?: boolean;
+};
 export type RigPose = {
   view: View;
   headView?: View; // lets the head lead the body by a frame during turns
@@ -84,11 +94,7 @@ const Svg: React.FC<{ markup: string; transform?: string; clipPath?: string }> =
   <g transform={transform} clipPath={clipPath} dangerouslySetInnerHTML={{ __html: markup }} />
 );
 
-export const Rig: React.FC<{ pose: RigPose; id?: string; shoulder?: "ball" | "tip" | "raglan" }> = ({
-  pose,
-  id = "rig",
-  shoulder = "ball",
-}) => {
+export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig" }) => {
   const { src, mirror } = SOURCE[pose.view];
   const view = RIG.views[src];
   const vt = viewTransform(pose.view);
@@ -99,12 +105,22 @@ export const Rig: React.FC<{ pose: RigPose; id?: string; shoulder?: "ball" | "ti
     const a = view.arms[side];
     const p = pose.arms[screenSide(side, mirror) as "l" | "r" | "near"] ?? REST;
     const s = SIGN[side];
-    // The shoulder rises a little as the arm goes up.
-    const lift = -14 * Math.min(1, Math.abs(p.shoulder) / 60);
-    const sh = `translate(0 ${lift}) rotate(${p.shoulder * s.sh} ${a.shoulder[0]} ${a.shoulder[1]})`;
+    const sh = `rotate(${p.shoulder * s.sh} ${a.shoulder[0]} ${a.shoulder[1]})`;
     const el = `rotate(${p.elbow * s.el} ${a.elbow[0]} ${a.elbow[1]})`;
     const wr = `rotate(${(p.wrist ?? 0) * s.el} ${a.wrist[0]} ${a.wrist[1]})`;
-    return { a, p, sh, el, wr };
+    // Foreshortening: squash the forearm along its own axis, about the elbow.
+    const f = p.forward ?? 0;
+    const q = 1 - 0.45 * f;
+    const [ux, uy] = [a.wrist[0] - a.elbow[0], a.wrist[1] - a.elbow[1]].map((v, _, w) => v / Math.hypot(w[0], w[1]));
+    const [m0, m1, m3] = [1 + (q - 1) * ux * ux, (q - 1) * ux * uy, 1 + (q - 1) * uy * uy];
+    const short = `matrix(${m0} ${m1} ${m1} ${m3} ${a.elbow[0] - m0 * a.elbow[0] - m1 * a.elbow[1]} ${a.elbow[1] - m1 * a.elbow[0] - m3 * a.elbow[1]})`;
+    const lower = `${el} ${short}`;
+    // The hand rides to the shortened wrist without being squashed, a touch bigger as it nears the camera.
+    const k = 1 + 0.12 * f;
+    const handAt = `${el} translate(${(q - 1) * (a.wrist[0] - a.elbow[0])} ${(q - 1) * (a.wrist[1] - a.elbow[1])}) ${wr} translate(${a.wrist[0]} ${a.wrist[1]}) scale(${k}) translate(${-a.wrist[0]} ${-a.wrist[1]})`;
+    // Arms tucked behind the torso bring the forearm and hand in front of it once they come forward.
+    const front = f > 0.35 && view.order.indexOf(`arm-${side}`) < view.order.indexOf("torso");
+    return { a, p, f, sh, lower, handAt, front };
   };
 
   const libHand = (side: string, a: ArmData, p: ArmPose) => {
@@ -112,7 +128,8 @@ export const Rig: React.FC<{ pose: RigPose; id?: string; shoulder?: "ball" | "ti
     const scale = view.handHeight / RIG.hands["turn-01"].height;
     // Library hands are drawn as the screen-left hand of the front view.
     const flip = (side === "r") !== !!p.mirrorHand ? -1 : 1;
-    const turn = hand.dir === "up" ? 180 : 0;
+    // Gesture hands are drawn fingers-up; they hang down at rest and stand up as the forearm comes forward.
+    const turn = hand.dir === "up" ? 180 * (1 - (p.forward ?? 0)) : 0;
     return (
       <Svg
         markup={hand.markup}
@@ -121,8 +138,42 @@ export const Rig: React.FC<{ pose: RigPose; id?: string; shoulder?: "ball" | "ti
     );
   };
 
+  const hand = (side: string) => {
+    const { a, p, sh, handAt } = armChain(side);
+    return (
+      <g transform={`${vt} ${sh} ${handAt}`}>
+        {p.hand ? libHand(side, a, p) : <Svg markup={view.pieces[`hand-${side}`]} transform={a.handFix} />}
+      </g>
+    );
+  };
+
+  // Forearm and hand drawn above everything else, for arms tucked behind the torso
+  // whose forearm has come forward. The elbow patch is kept small so it only
+  // erases the forearm's cap line, not the vest next to the arm.
+  const forearm = (side: string) => {
+    const { a, sh, lower } = armChain(side);
+    const clip = `${id}-elbow-front-${side}`;
+    return (
+      <g key={`front-${side}`}>
+        <g transform={vt}>
+          <g transform={sh}>
+            <Svg markup={a.lower} transform={lower} />
+            <clipPath id={clip}>
+              <circle cx={a.elbow[0]} cy={a.elbow[1]} r={a.patch * 0.35} />
+            </clipPath>
+            <g clipPath={`url(#${clip})`}>
+              <Svg markup={a.upperFill} />
+              <Svg markup={a.lowerFill} transform={lower} />
+            </g>
+          </g>
+        </g>
+        {hand(side)}
+      </g>
+    );
+  };
+  const frontLayer: React.ReactNode[] = [];
+
   const head = pose.head ?? {};
-  const neck = view.neck;
 
   return (
     <svg viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} width="100%" height="100%" overflow="visible">
@@ -143,37 +194,39 @@ export const Rig: React.FC<{ pose: RigPose; id?: string; shoulder?: "ball" | "ti
         }
         if (name.startsWith("arm-")) {
           const side = name.slice(4);
-          const { a, sh, el } = armChain(side);
+          const { a, sh, lower, front } = armChain(side);
           const clip = `${id}-elbow-${side}`;
+          if (front) frontLayer.push(forearm(side));
           return (
             <g key={name} transform={vt}>
               <g transform={sh}>
                 <Svg markup={a.upper} />
-                <Svg markup={a.lower} transform={el} />
-                {/* Elbow patch: both sleeve fills, clipped to a circle at the joint,
-                    paint over the outlines where the two pieces cross. */}
-                <clipPath id={clip}>
-                  <circle cx={a.elbow[0]} cy={a.elbow[1]} r={a.patch} />
-                </clipPath>
-                <g clipPath={`url(#${clip})`}>
-                  <Svg markup={a.upperFill} />
-                  <Svg markup={a.lowerFill} transform={el} />
-                </g>
+                {!front && (
+                  <>
+                    <Svg markup={a.lower} transform={lower} />
+                    {/* Elbow patch: both sleeve fills, clipped to a circle at the joint,
+                        paint over the outlines where the two pieces cross. */}
+                    <clipPath id={clip}>
+                      <circle cx={a.elbow[0]} cy={a.elbow[1]} r={a.patch} />
+                    </clipPath>
+                    <g clipPath={`url(#${clip})`}>
+                      <Svg markup={a.upperFill} />
+                      <Svg markup={a.lowerFill} transform={lower} />
+                    </g>
+                  </>
+                )}
               </g>
             </g>
           );
         }
         if (name.startsWith("hand-")) {
           const side = name.slice(5);
-          const { a, p, sh, el, wr } = armChain(side);
-          return (
-            <g key={name} transform={`${vt} ${sh} ${el} ${wr}`}>
-              {p.hand ? libHand(side, a, p) : <Svg markup={view.pieces[name]} />}
-            </g>
-          );
+          if (armChain(side).front) return null;
+          return <g key={name}>{hand(side)}</g>;
         }
         return <Svg key={name} markup={view.pieces[name]} transform={vt} />;
       })}
+      {frontLayer}
     </svg>
   );
 };

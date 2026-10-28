@@ -102,6 +102,10 @@ function arm(group) {
   const wrist = [meanX(cuff), lb.maxY - 18];
   const atElbow = U.filter((p) => Math.abs(p[1] - elbow[1]) < 10);
   const half = atElbow.length ? (Math.max(...atElbow.map((p) => p[0])) - Math.min(...atElbow.map((p) => p[0]))) / 2 : 60;
+  // Centre of the rounded shoulder: a circle as wide as the sleeve just below its top.
+  const nearTop = U.filter((p) => Math.abs(p[1] - (ub.minY + 40)) < 4).map((p) => p[0]);
+  const capR = (Math.max(...nearTop) - Math.min(...nearTop)) / 2;
+  const cap = [(Math.max(...nearTop) + Math.min(...nearTop)) / 2, ub.minY + capR];
   return {
     upper: markup(upper),
     lower: markup(lower),
@@ -110,8 +114,11 @@ function arm(group) {
     elbow: pt(...elbow),
     wrist: pt(...wrist),
     patch: round(half * 2.3),
-    // The sleeve turns around its own tip (like a raglan seam), so no notch opens at the shoulder.
-    shoulder: pt(uTop[0], uTop[1] + 12),
+    // The shoulder turns in place, around the centre of its round cap.
+    shoulder: pt(...cap),
+    tip: pt(uTop[0], uTop[1]),
+    cap: pt(...cap),
+    capR: round(capR),
   };
 }
 
@@ -169,49 +176,65 @@ for (const file of readdirSync(dir).sort()) {
 }
 
 // --- borrowed arms -------------------------------------------------------------
-// The profile arm (rounded shoulder) reads better in every view than the pointed
-// sleeves drawn for the front and back. It's fitted shoulder-to-wrist onto each
-// view's own arm, mirrored on the left so the elbow bends in toward the body,
-// and tucked behind the torso so the vest hides about half the shoulder cap.
+// The profile arm (rounded shoulder) replaces the pointed sleeves drawn for the
+// front and back. It's laid out in a fixed resting pose: upper arm 20° out from
+// vertical, forearm 15°, so the elbow sits just outside the line of the arm. The
+// shoulder pivots on the centre of its round cap, so it turns in place.
+const REST = { upper: 20, forearm: 15 };
 const BORROW = { from: "090", side: "near", into: ["000", "045", "180"], shoulderIn: 40 };
+// Views where the vest covers the shoulder; in 045 the near arm stays in front.
+const BEHIND = ["000", "180"];
 
-function fit(src, dst, mirror) {
-  // Reflect about the source shoulder, then rotate + scale + translate onto dst.
-  const m = mirror ? [-1, 0, 0, 1, 2 * src.shoulder[0], 0] : [1, 0, 0, 1, 0, 0];
-  const ap = (p) => [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]];
-  const s0 = ap(src.shoulder), s1 = ap(src.wrist);
-  const k = Math.hypot(dst.wrist[0] - dst.shoulder[0], dst.wrist[1] - dst.shoulder[1]) / Math.hypot(s1[0] - s0[0], s1[1] - s0[1]);
-  const a = Math.atan2(dst.wrist[1] - dst.shoulder[1], dst.wrist[0] - dst.shoulder[0]) - Math.atan2(s1[1] - s0[1], s1[0] - s0[0]);
-  const [c, s] = [k * Math.cos(a), k * Math.sin(a)];
-  // q = R·(m·p − s0) + dst.shoulder, as one matrix
-  const r = [c * m[0] - s * m[1], s * m[0] + c * m[1], c * m[2] - s * m[3], s * m[2] + c * m[3]];
-  const tx = c * (m[4] - s0[0]) - s * (m[5] - s0[1]) + dst.shoulder[0];
-  const ty = s * (m[4] - s0[0]) + c * (m[5] - s0[1]) + dst.shoulder[1];
-  const mat = [...r, tx, ty];
-  const apply = (p) => pt(mat[0] * p[0] + mat[2] * p[1] + mat[4], mat[1] * p[0] + mat[3] * p[1] + mat[5]);
-  return { matrix: `matrix(${mat.map((v) => Math.round(v * 1000) / 1000).join(" ")})`, apply, k };
-}
+const deg = (rad) => (rad * 180) / Math.PI;
+// Angle from vertical, positive toward +x.
+const lean = (a, b) => deg(Math.atan2(b[0] - a[0], b[1] - a[1]));
+const mul = (m, n) => [
+  m[0] * n[0] + m[2] * n[1],
+  m[1] * n[0] + m[3] * n[1],
+  m[0] * n[2] + m[2] * n[3],
+  m[1] * n[2] + m[3] * n[3],
+  m[0] * n[4] + m[2] * n[5] + m[4],
+  m[1] * n[4] + m[3] * n[5] + m[5],
+];
+const at = (m, p) => [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]];
+// Svg rotate(θ) about c: clockwise on screen, which lowers lean() by θ.
+const rotate = (thetaDeg, c) => {
+  const t = (thetaDeg * Math.PI) / 180, [co, si] = [Math.cos(t), Math.sin(t)];
+  return [co, si, -si, co, c[0] - co * c[0] + si * c[1], c[1] - si * c[0] - co * c[1]];
+};
+const svgMatrix = (m) => `matrix(${m.map((v) => Math.round(v * 1000) / 1000).join(" ")})`;
 
 const donor = views[BORROW.from].arms[BORROW.side];
 for (const v of BORROW.into) {
   const view = views[v];
   for (const side of Object.keys(view.arms)) {
     const own = view.arms[side];
-    const inward = Math.sign(view.anchorX - own.shoulder[0]) * BORROW.shoulderIn;
-    const dst = { shoulder: [own.shoulder[0] + inward, own.shoulder[1]], wrist: own.wrist };
-    const { matrix, apply, k } = fit(donor, dst, side === "l");
-    const wrap = (markup) => `<g transform="${matrix}">${markup}</g>`;
+    const out = side === "l" ? -1 : 1; // screen direction away from the body
+    // The donor faces right, elbow on its left; mirror it on the right so the elbow points out.
+    const mirror = side === "r" ? [-1, 0, 0, 1, 2 * donor.cap[0], 0] : [1, 0, 0, 1, 0, 0];
+    const cap = [own.tip[0] - out * BORROW.shoulderIn, own.tip[1] + donor.capR];
+    const place = [1, 0, 0, 1, cap[0] - donor.cap[0], cap[1] - donor.cap[1]];
+    let mu = mul(place, mirror);
+    mu = mul(rotate(lean(at(mu, donor.cap), at(mu, donor.elbow)) - out * REST.upper, cap), mu);
+    const elbow = at(mu, donor.elbow);
+    const ml = mul(rotate(lean(elbow, at(mu, donor.wrist)) - out * REST.forearm, elbow), mu);
+    const wrist = at(ml, donor.wrist);
+    // The view's own hand was drawn at the old wrist and angle; carry it over.
+    const handTurn = lean(own.elbow, own.wrist) - out * REST.forearm;
+    const handFix = `translate(${round(wrist[0] - own.wrist[0])} ${round(wrist[1] - own.wrist[1])}) rotate(${round(handTurn)} ${own.wrist[0]} ${own.wrist[1]})`;
     view.arms[side] = {
-      upper: wrap(donor.upper),
-      lower: wrap(donor.lower),
-      upperFill: wrap(donor.upperFill),
-      lowerFill: wrap(donor.lowerFill),
-      elbow: apply(donor.elbow),
-      wrist: apply(donor.wrist),
-      patch: round(donor.patch * k),
-      shoulder: apply(donor.shoulder),
+      upper: `<g transform="${svgMatrix(mu)}">${donor.upper}</g>`,
+      lower: `<g transform="${svgMatrix(ml)}">${donor.lower}</g>`,
+      upperFill: `<g transform="${svgMatrix(mu)}">${donor.upperFill}</g>`,
+      lowerFill: `<g transform="${svgMatrix(ml)}">${donor.lowerFill}</g>`,
+      shoulder: pt(...cap),
+      elbow: pt(...elbow),
+      wrist: pt(...wrist),
+      patch: donor.patch,
+      handFix,
     };
   }
+  if (!BEHIND.includes(v)) continue;
   // Arms (and the hands drawn with them) go right under the torso.
   const torsoAt = view.order.indexOf("torso");
   const arms = view.order.filter((n, i) => n.startsWith("arm-") && i > torsoAt);

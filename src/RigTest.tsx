@@ -12,24 +12,24 @@ const TURNS: TurnKey[] = [
 ];
 
 const LEFT: ArmKey[] = [
-  { at: s(0.8), pose: { shoulder: 36, elbow: 150, wrist: -10, hand: "index-up" } },
+  { at: s(0.8), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: 0, hand: "index-up" } },
   { at: s(2.2), pose: { shoulder: 0, elbow: 0 } },
-  { at: s(9.6), pose: { shoulder: 44, elbow: 140, wrist: -4, hand: "ok" } },
+  { at: s(9.6), pose: { shoulder: 2, elbow: -20, forward: 1, wrist: -5, hand: "ok" } },
   { at: s(12.2), pose: { shoulder: 0, elbow: 0 } },
 ];
 
 const RIGHT: ArmKey[] = [
-  { at: s(2.6), pose: { shoulder: 42, elbow: 118, hand: "peace" } },
-  { at: s(3.0), pose: { shoulder: 42, elbow: 118, wrist: 14, hand: "peace" } },
-  { at: s(3.3), pose: { shoulder: 42, elbow: 118, wrist: -10, hand: "peace" } },
-  { at: s(3.6), pose: { shoulder: 42, elbow: 118, wrist: 14, hand: "peace" } },
+  { at: s(2.6), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: 0, hand: "peace" } },
+  { at: s(3.0), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: 12, hand: "peace" } },
+  { at: s(3.3), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: -8, hand: "peace" } },
+  { at: s(3.6), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: 12, hand: "peace" } },
   { at: s(4.0), pose: { shoulder: 0, elbow: 0 } },
-  { at: s(10.6), pose: { shoulder: 30, elbow: 140, hand: "rock" } },
+  { at: s(10.6), pose: { shoulder: 2, elbow: -20, forward: 1, wrist: 0, hand: "rock" } },
   { at: s(12.2), pose: { shoulder: 0, elbow: 0 } },
 ];
 
 const NEAR: ArmKey[] = [
-  { at: s(5.3), pose: { shoulder: 75, elbow: 15, wrist: 0, hand: "index-up" } },
+  { at: s(5.3), pose: { shoulder: 15, elbow: 70, wrist: -10, hand: "index-up" } },
   { at: s(6.3), pose: { shoulder: 0, elbow: 0 } },
 ];
 
