@@ -15,61 +15,61 @@ const f = (sec: number) => Math.round(sec * FPS);
 const REST: ArmPose = { shoulder: 0, elbow: 0 };
 // Open palm toward the camera: the presenting hand.
 const PALM = "turn-03";
-const THUMB = "thumbs-up_135";
+// "Done": the thumbs-up drawn lying on its side, mirrored, on a low forearm.
+const THUMB = "thumbs-up_000";
 
-// No two gestures land on the same pose: each sets its own shoulder rotation
-// (the whole arm swinging out from the shoulder anchor) and elbow bend, the
-// way a person never raises a hand to exactly the same place twice. The
-// wrist stays in line with the forearm throughout.
-const pose = (shoulder: number, elbow: number, hand?: string): ArmPose => ({ shoulder, elbow, hand });
+// The house style is the low, open gesture: forearm out to the side at hip
+// height, palm open (the "good luck with that" shrug). The forearm comes all
+// the way up only twice: the count, and the name at the end. The shoulder
+// anchor never moves; the arm swings out from it a few degrees at a time.
+const pose = (shoulder: number, elbow: number, hand?: string, mirrorHand?: boolean): ArmPose => ({ shoulder, elbow, hand, mirrorHand });
+const low = (shoulder: number, elbow: number) => pose(shoulder, elbow, PALM);
 
 const key = (sec: number, p: ArmPose): ArmKey => ({ at: f(sec), pose: p });
 
-// One arm carries each idea; the resting arm only sways from the shoulder.
-// Screen-left arm (Griff's right hand): the question, the count, "Done".
+// Screen-left arm (Griff's right hand): the shrug, the count, "Done", the close.
 const LEFT: ArmKey[] = [
-  key(w("adorable"), pose(8, 0)),
-  key(w("good"), pose(4, 28, PALM)),
+  key(w("adorable"), pose(7, 0)),
+  key(w("good"), low(4, 30)),
   key(w("that") + 0.4, pose(1, 3)),
-  key(w("build"), pose(14, 112, "index-up")),
-  key(w("sure"), pose(5, 6)),
+  key(w("build"), pose(8, 6)),
+  key(w("sure"), pose(3, 2)),
+  // Up #1: counting the DIY list.
   key(w("dashboards") - 0.1, pose(10, 120, "index-up")),
   key(w("multi-tenant"), pose(13, 124, "peace")),
   key(w("maintenance"), pose(16, 127, "three")),
-  key(w("until"), pose(12, 108, "three")),
-  key(w("or"), pose(2, 4)),
-  key(w("done") - 0.1, pose(14, 118, THUMB)),
-  key(w("nonsense"), pose(9, 10)),
-  key(w("live"), pose(3, 2)),
-  key(w("herd"), pose(7, 0)),
-  key(w("no", 2), pose(2, 3)),
-  key(w("embedded", 1), pose(12, 98, PALM)),
+  key(w("until"), pose(6, 40, "three")),
+  key(w("or"), pose(2, 3)),
+  key(w("done") - 0.1, pose(3, 52, THUMB, true)),
+  key(w("nonsense"), pose(6, 4)),
+  key(w("no", 2), pose(2, 2)),
+  key(w("embedded", 1), low(4, 30)),
 ];
 
 // Screen-right arm (Griff's left hand): the introduction, the GOAT IQ steps,
-// and the closing run from "Live this afternoon" to the name.
+// "this afternoon", and the name.
 const RIGHT: ArmKey[] = [
-  key(w("your") - 0.1, pose(16, 104, PALM)),
-  key(w("baked"), pose(19, 109, PALM)),
-  key(w("app"), pose(14, 100, PALM)),
-  key(w("adorable"), pose(7, 4)),
-  key(w("good"), pose(0, 36, PALM)),
+  key(w("your") - 0.1, low(6, 40)),
+  key(w("baked"), low(8, 42)),
+  key(w("app"), low(5, 36)),
+  key(w("adorable"), pose(6, 3)),
+  key(w("good"), low(0, 36)),
   key(w("that") + 0.4, pose(2, 2)),
-  key(w("multi-tenant"), pose(7, 6)),
+  key(w("multi-tenant"), pose(7, 4)),
   key(w("until"), pose(1, 2)),
-  key(w("drop"), pose(9, 96, PALM)),
-  key(w("goatiq") - 0.05, pose(15, 122, "index-up")),
-  key(w("plug"), pose(8, 104, "fist")),
-  key(w("embed"), pose(13, 110, PALM)),
-  key(w("let"), pose(10, 106, "index-up")),
-  key(w("themselves"), pose(7, 8)),
-  key(w("live"), pose(12, 126, "index-up")),
-  key(w("not"), pose(15, 131, "index-up")),
-  key(w("embedded"), pose(9, 112, "index-up")),
-  key(w("30"), pose(14, 124, "three")),
-  key(w("no", 2), pose(6, 100, "fist")),
-  key(w("goatiq", 1) - 0.1, pose(17, 128, "rock")),
-  key(w("embedded", 1), pose(15, 102, PALM)),
+  key(w("drop"), low(8, 42)),
+  key(w("plug"), low(6, 38)),
+  key(w("embed"), low(9, 43)),
+  key(w("let"), low(7, 40)),
+  key(w("themselves"), pose(6, 6)),
+  key(w("live"), low(8, 44)),
+  key(w("not"), low(4, 36)),
+  key(w("embedded"), pose(3, 3)),
+  key(w("30"), pose(8, 5)),
+  key(w("no", 2), pose(1, 2)),
+  // Up #2: the name.
+  key(w("goatiq", 1) - 0.1, pose(14, 126, "rock")),
+  key(w("embedded", 1), low(5, 32)),
 ];
 
 // Brows (px up; negative frowns) and head (degrees tilt, px nod), per beat.
@@ -129,7 +129,7 @@ export const GriffPresent: React.FC = () => {
 
   // Waist up: horn tips to just below the jacket hem, with room for the hands at the sides.
   const k = width / 1080;
-  const scale = 0.9 * k;
+  const scale = 0.84 * k;
   const rigW = STAGE_W * scale;
   const push = 1 + t * 0.0015;
 
@@ -140,7 +140,7 @@ export const GriffPresent: React.FC = () => {
         style={{
           position: "absolute",
           left: (width - rigW) / 2,
-          top: -40 * scale,
+          top: -10 * scale,
           width: rigW,
           height: 1764 * scale,
           transformOrigin: `50% ${600 * scale}px`,

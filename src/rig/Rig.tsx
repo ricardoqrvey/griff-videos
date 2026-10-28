@@ -146,6 +146,15 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
             <g key={name} transform={viewTransform(headView)}>
               <g transform={`translate(0 ${head.nod ?? 0}) rotate(${head.tilt ?? 0} ${hn[0]} ${hn[1]})`}>
                 <Svg markup={headSrc.pieces.head} />
+                {headSrc.pieces.glare && (
+                  // The glare lags the head a little, as a reflection would.
+                  <>
+                    <clipPath id={`${id}-lens`} dangerouslySetInnerHTML={{ __html: headSrc.pieces.lens }} />
+                    <g clipPath={`url(#${id}-lens)`}>
+                      <Svg markup={headSrc.pieces.glare} transform={`translate(${-(head.tilt ?? 0) * 3.5} ${(head.nod ?? 0) * 1.2})`} />
+                    </g>
+                  </>
+                )}
                 {pose.face && <Face view={SOURCE[headView].src} mirror={SOURCE[headView].mirror} pose={pose.face} id={id} />}
               </g>
             </g>

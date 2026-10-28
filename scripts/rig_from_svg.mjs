@@ -13,6 +13,15 @@ import { svgPathProperties } from "svg-path-properties";
 const [dir, outFile] = process.argv.slice(2);
 const VIEW_RE = /^griff_(\d{3})\.svg$/;
 const HAND_RE = /^hand_(.+)\.svg$/;
+// Sunglasses, per view: the glare bands are pulled out of the head art so the
+// rig can slide them across the lenses as the head moves.
+const GLASSES = {
+  "000": { glare: ["#423143"], lens: ["#000100"] },
+  "045": { glare: ["#57405a"], lens: ["#020202"] },
+};
+const byFill = (node, colours) =>
+  node.querySelectorAll(SHAPES).filter((el) => colours.includes(el.getAttribute("fill")));
+
 // Hand views drawn lying on their side: which edge the wrist is on.
 const SIDEWAYS = { "thumbs-up_000": "left", "thumbs-up_045": "left", "thumbs-up_180": "right" };
 
@@ -159,6 +168,14 @@ for (const file of readdirSync(dir).sort()) {
       order.push(name);
       if (name.startsWith("arm-")) arms[name.slice(4)] = arm(child);
       else pieces[name] = markup(child);
+      if (name === "head" && GLASSES[v[1]]) {
+        const g = GLASSES[v[1]];
+        const glare = byFill(child, g.glare);
+        pieces.glare = glare.map((el) => el.toString()).join("");
+        pieces.lens = byFill(child, g.lens).map((el) => el.toString().replace(/\s+id="[^"]*"/g, "")).join("");
+        for (const el of glare) el.remove();
+        pieces.head = markup(child);
+      }
       if (name.startsWith("hand-")) handHeight = Math.max(handHeight, bbox(pts(child)).maxY - bbox(pts(child)).minY);
     }
     const head = bbox(pts(group.querySelector("#head")));
