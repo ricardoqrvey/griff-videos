@@ -13,64 +13,63 @@ const w = (word: string, nth = 0) => WORDS.filter((x) => x.text.toLowerCase().re
 const f = (sec: number) => Math.round(sec * FPS);
 
 const REST: ArmPose = { shoulder: 0, elbow: 0 };
-// Forearm up from the elbow, hand at chest (LOW) or shoulder (UP) height.
-const LOW = { shoulder: 4, elbow: 112 };
-const UP = { shoulder: 6, elbow: 128 };
-// Forearm out to the side at hip height: the shrug.
-const SHRUG = { shoulder: 2, elbow: 32 };
 // Open palm toward the camera: the presenting hand.
 const PALM = "turn-03";
-// The wrist never bends away from the forearm; emphasis comes from the elbow.
-// `lift` raises (+) or drops (−) the forearm a few degrees from the base pose.
-const OPEN = (lift = 0) => ({ ...LOW, elbow: LOW.elbow + lift, hand: PALM });
-const show = (hand: string, lift = 0, pose = UP) => ({ ...pose, elbow: pose.elbow + lift, hand });
+const THUMB = "thumbs-up_135";
 
-const key = (sec: number, pose: ArmPose): ArmKey => ({ at: f(sec), pose });
+// No two gestures land on the same pose: each sets its own shoulder rotation
+// (the whole arm swinging out from the shoulder anchor) and elbow bend, the
+// way a person never raises a hand to exactly the same place twice. The
+// wrist stays in line with the forearm throughout.
+const pose = (shoulder: number, elbow: number, hand?: string): ArmPose => ({ shoulder, elbow, hand });
 
-// Arms at rest, or rest with the arm opened a few degrees from the shoulder.
-const EASE: ArmPose = { shoulder: 6, elbow: 0 };
+const key = (sec: number, p: ArmPose): ArmKey => ({ at: f(sec), pose: p });
 
-// One arm carries each idea; the other stays down. Holds over changes.
+// One arm carries each idea; the resting arm only sways from the shoulder.
 // Screen-left arm (Griff's right hand): the question, the count, "Done".
 const LEFT: ArmKey[] = [
-  key(w("adorable"), EASE),
-  key(w("good"), { ...SHRUG, hand: PALM }),
-  key(w("that") + 0.4, REST),
-  key(w("build"), show("index-up")),
-  key(w("sure"), EASE),
-  key(w("dashboards") - 0.1, show("index-up")),
-  key(w("multi-tenant"), show("peace")),
-  key(w("maintenance"), show("three")),
-  key(w("until"), show("three", -12)),
-  key(w("or"), REST),
-  key(w("done") - 0.1, show("ok")),
-  key(w("nonsense"), EASE),
-  key(w("live"), REST),
-  key(w("embedded", 1), OPEN()),
+  key(w("adorable"), pose(8, 0)),
+  key(w("good"), pose(4, 28, PALM)),
+  key(w("that") + 0.4, pose(1, 3)),
+  key(w("build"), pose(14, 112, "index-up")),
+  key(w("sure"), pose(5, 6)),
+  key(w("dashboards") - 0.1, pose(10, 120, "index-up")),
+  key(w("multi-tenant"), pose(13, 124, "peace")),
+  key(w("maintenance"), pose(16, 127, "three")),
+  key(w("until"), pose(12, 108, "three")),
+  key(w("or"), pose(2, 4)),
+  key(w("done") - 0.1, pose(14, 118, THUMB)),
+  key(w("nonsense"), pose(9, 10)),
+  key(w("live"), pose(3, 2)),
+  key(w("herd"), pose(7, 0)),
+  key(w("no", 2), pose(2, 3)),
+  key(w("embedded", 1), pose(12, 98, PALM)),
 ];
 
 // Screen-right arm (Griff's left hand): the introduction, the GOAT IQ steps,
 // and the closing run from "Live this afternoon" to the name.
 const RIGHT: ArmKey[] = [
-  key(w("your") - 0.1, OPEN()),
-  key(w("baked"), OPEN(8)),
-  key(w("app"), OPEN()),
-  key(w("adorable"), EASE),
-  key(w("good"), { ...SHRUG, hand: PALM }),
-  key(w("that") + 0.4, REST),
-  key(w("drop"), OPEN(-6)),
-  key(w("goatiq") - 0.05, show("index-up")),
-  key(w("plug"), { ...LOW, hand: "fist" }),
-  key(w("embed"), OPEN(6)),
-  key(w("let"), { ...LOW, hand: "index-up" }),
-  key(w("themselves"), EASE),
-  key(w("live"), show("index-up")),
-  key(w("not"), show("index-up", 6)),
-  key(w("embedded"), { ...LOW, hand: "index-up" }),
-  key(w("30"), show("three")),
-  key(w("no", 2), { ...LOW, hand: "fist" }),
-  key(w("goatiq", 1) - 0.1, show("rock")),
-  key(w("embedded", 1), OPEN()),
+  key(w("your") - 0.1, pose(16, 104, PALM)),
+  key(w("baked"), pose(19, 109, PALM)),
+  key(w("app"), pose(14, 100, PALM)),
+  key(w("adorable"), pose(7, 4)),
+  key(w("good"), pose(0, 36, PALM)),
+  key(w("that") + 0.4, pose(2, 2)),
+  key(w("multi-tenant"), pose(7, 6)),
+  key(w("until"), pose(1, 2)),
+  key(w("drop"), pose(9, 96, PALM)),
+  key(w("goatiq") - 0.05, pose(15, 122, "index-up")),
+  key(w("plug"), pose(8, 104, "fist")),
+  key(w("embed"), pose(13, 110, PALM)),
+  key(w("let"), pose(10, 106, "index-up")),
+  key(w("themselves"), pose(7, 8)),
+  key(w("live"), pose(12, 126, "index-up")),
+  key(w("not"), pose(15, 131, "index-up")),
+  key(w("embedded"), pose(9, 112, "index-up")),
+  key(w("30"), pose(14, 124, "three")),
+  key(w("no", 2), pose(6, 100, "fist")),
+  key(w("goatiq", 1) - 0.1, pose(17, 128, "rock")),
+  key(w("embedded", 1), pose(15, 102, PALM)),
 ];
 
 // Brows (px up; negative frowns) and head (degrees tilt, px nod), per beat.
