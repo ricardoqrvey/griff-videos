@@ -6,7 +6,7 @@ import { ArmPose, turnPath, View } from "./Rig";
 export type ArmKey = { at: number; pose: ArmPose };
 export type TurnKey = { at: number; to: View; dir?: "cw" | "ccw" };
 
-const REST: ArmPose = { shoulder: 0, elbow: 0, wrist: 0, forward: 0 };
+const REST: ArmPose = { shoulder: 0, elbow: 0, wrist: 0 };
 const HOLD = 3; // frames on each in-between view
 const SWAP_HAND_AFTER = 3; // frames into a move before the hand shape changes
 
@@ -23,7 +23,6 @@ export function armAt(frame: number, fps: number, keys: ArmKey[]): ArmPose {
       shoulder: mix(prev.shoulder, k.pose.shoulder),
       elbow: mix(prev.elbow, k.pose.elbow),
       wrist: mix(prev.wrist, k.pose.wrist),
-      forward: mix(prev.forward, k.pose.forward),
     };
     if (frame >= k.at + SWAP_HAND_AFTER) {
       hand = k.pose.hand;

@@ -26,38 +26,27 @@ const TURNS: TurnKey[] = [
   { at: on("ai-powered", 0, -0.2), to: "000", dir: "ccw" },
 ];
 
-// Griff is relaxed: most beats are just the hands turning or the wrists
-// flicking. For the few signature gestures the forearm comes forward (toward
-// the camera) rather than up, and the shoulders all but stay still.
+// Griff is relaxed: a handful of gestures, the forearm swinging up from the
+// elbow only to chest height, the hand always following the forearm.
+const UP = { shoulder: 6, elbow: 128 };
 const LEFT: ArmKey[] = [
-  { at: on("your"), pose: { shoulder: 0, elbow: 0, wrist: 6, hand: "turn-02" } },
-  { at: on("build"), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: 0, hand: "index-up" } },
-  { at: on("sure"), pose: { shoulder: 0, elbow: 0, wrist: -4, hand: "turn-02" } },
-  { at: on("months"), pose: { shoulder: 0, elbow: 0, wrist: 8, hand: "turn-03" } },
-  { at: on("drop", 0, -0.3), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("done"), pose: { shoulder: 2, elbow: -20, forward: 1, wrist: -5, hand: "ok" } },
+  { at: on("build"), pose: { ...UP, wrist: 18, hand: "index-up" } },
+  { at: on("sure"), pose: { shoulder: 0, elbow: 0 } },
+  { at: on("done"), pose: { ...UP, wrist: 20, hand: "ok" } },
   { at: on("nonsense"), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("live"), pose: { shoulder: 0, elbow: 0, wrist: 5, hand: "turn-02" } },
-  { at: on("excuses"), pose: { shoulder: 0, elbow: 0 } },
 ];
 
 const RIGHT: ArmKey[] = [
-  { at: on("adorable"), pose: { shoulder: 0, elbow: 0, wrist: -6, hand: "turn-02" } },
-  { at: on("good"), pose: { shoulder: 0, elbow: 0, wrist: 6, hand: "turn-02" } },
-  { at: on("months"), pose: { shoulder: 0, elbow: 0, wrist: -8, hand: "turn-03" } },
-  { at: on("drop", 0, -0.3), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("live"), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: 0, hand: "peace" } },
-  { at: on("afternoon"), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: 12, hand: "peace" } },
-  { at: on("quarter"), pose: { shoulder: 2, elbow: -25, forward: 1, wrist: -8, hand: "peace" } },
+  { at: on("live"), pose: { ...UP, wrist: 18, hand: "peace" } },
+  { at: on("afternoon"), pose: { ...UP, wrist: 30, hand: "peace" } },
+  { at: on("quarter"), pose: { ...UP, wrist: 16, hand: "peace" } },
   { at: on("minus"), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("ai-powered"), pose: { shoulder: 2, elbow: -20, forward: 1, wrist: 0, hand: "rock" } },
+  { at: on("ai-powered"), pose: { ...UP, wrist: 18, hand: "rock" } },
 ];
 
 const NEAR: ArmKey[] = [
   { at: on("drop"), pose: { shoulder: 15, elbow: 70, wrist: -10, hand: "index-up" } },
   { at: on("plug", 0, -0.2), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("excuses"), pose: { shoulder: 0, elbow: 0, wrist: 8, hand: "turn-05" } },
-  { at: on("ai-powered", 0, -0.3), pose: { shoulder: 0, elbow: 0 } },
 ];
 
 // A slow drift in the wrists and elbows so the hands never freeze.

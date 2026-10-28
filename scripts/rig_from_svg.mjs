@@ -232,6 +232,7 @@ for (const v of BORROW.into) {
       wrist: pt(...wrist),
       patch: donor.patch,
       handFix,
+      handTurn: round(handTurn),
     };
   }
   if (!BEHIND.includes(v)) continue;
