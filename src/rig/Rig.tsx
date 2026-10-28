@@ -37,6 +37,7 @@ type HandData = {
   wrist: Pt;
   axis: Pt; // wrist to palm centre, as drawn
   left: boolean; // drawn as a left hand
+  scale: number; // size correction for shapes exported smaller than the set
   dir: "down" | "up" | "left" | "right";
   height: number;
 };
@@ -116,7 +117,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
 
   const libHand = (side: string, a: ArmData, p: ArmPose) => {
     const hand = RIG.hands[p.hand!];
-    const scale = view.handHeight / RIG.hands["turn-01"].height;
+    const scale = (view.handHeight / RIG.hands["turn-01"].height) * hand.scale;
     // Thumb on the correct side: the screen-left arm is Griff's right hand, so
     // left-hand drawings (and every hand on the right arm) are mirrored.
     const flip = (side === "r") !== hand.left !== !!p.mirrorHand ? -1 : 1;

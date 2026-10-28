@@ -22,6 +22,9 @@ const GLASSES = {
 const byFill = (node, colours) =>
   node.querySelectorAll(SHAPES).filter((el) => colours.includes(el.getAttribute("fill")));
 
+// Shapes that came out of Turntable smaller than the rest of the set.
+const HAND_SCALE = { "thumbs-up": 1.18 };
+
 // Hand views drawn lying on their side: which edge the wrist is on.
 const SIDEWAYS = { "thumbs-up_000": "left", "thumbs-up_045": "left", "thumbs-up_180": "right" };
 
@@ -237,6 +240,7 @@ for (const file of readdirSync(dir).sort()) {
       axis: pt(centre[0] - wrist[0], centre[1] - wrist[1]),
       // Gesture hands are drawn as right hands; the rest (turn) series as left hands.
       left: name.startsWith("turn-"),
+      scale: HAND_SCALE[shape] ?? 1,
       dir,
       height: round(dir === "left" || dir === "right" ? b.maxX - b.minX : b.maxY - b.minY),
     };
