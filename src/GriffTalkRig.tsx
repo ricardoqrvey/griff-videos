@@ -32,7 +32,7 @@ const UP = { shoulder: 6, elbow: 128 };
 const LEFT: ArmKey[] = [
   { at: on("build"), pose: { ...UP, wrist: 18, hand: "index-up" } },
   { at: on("sure"), pose: { shoulder: 0, elbow: 0 } },
-  { at: on("done"), pose: { ...UP, wrist: 20, hand: "ok" } },
+  { at: on("done"), pose: { ...UP, wrist: 50, hand: "ok" } },
   { at: on("nonsense"), pose: { shoulder: 0, elbow: 0 } },
 ];
 

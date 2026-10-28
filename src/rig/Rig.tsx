@@ -16,6 +16,7 @@ type ArmData = {
   patch: number;
   handFix?: string; // moves a view's own hand onto a borrowed arm's wrist
   handTurn?: number; // and the angle that hand was turned by, for library hands
+  swingIn?: boolean; // in front of the torso: the elbow bends across the body
 };
 type ViewData = {
   w: number;
@@ -96,7 +97,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
   const armChain = (side: string) => {
     const a = view.arms[side];
     const p = pose.arms[screenSide(side, mirror) as "l" | "r" | "near"] ?? REST;
-    const s = SIGN[side];
+    const s = a.swingIn ? { ...SIGN[side], el: -SIGN[side].el } : SIGN[side];
     const sh = `rotate(${p.shoulder * s.sh} ${a.shoulder[0]} ${a.shoulder[1]})`;
     const el = `rotate(${p.elbow * s.el} ${a.elbow[0]} ${a.elbow[1]})`;
     const wr = `rotate(${(p.wrist ?? 0) * s.el} ${a.wrist[0]} ${a.wrist[1]})`;

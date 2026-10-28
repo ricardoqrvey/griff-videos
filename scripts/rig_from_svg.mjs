@@ -235,7 +235,12 @@ for (const v of BORROW.into) {
       handTurn: round(handTurn),
     };
   }
-  if (!BEHIND.includes(v)) continue;
+  if (!BEHIND.includes(v)) {
+    // An arm in front of the torso bends across the body, not away from it.
+    const torsoAt = view.order.indexOf("torso");
+    for (const side of Object.keys(view.arms)) view.arms[side].swingIn = view.order.indexOf(`arm-${side}`) > torsoAt;
+    continue;
+  }
   // Arms (and the hands drawn with them) go right under the torso.
   const torsoAt = view.order.indexOf("torso");
   const arms = view.order.filter((n, i) => n.startsWith("arm-") && i > torsoAt);
