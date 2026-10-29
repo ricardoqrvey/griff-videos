@@ -37,6 +37,17 @@ Lipsync uses [Rhubarb Lip Sync](https://github.com/DanielSWolf/rhubarb-lip-sync)
 - `FaceSheet`: every mouth shape and brow on every view, for tuning.
 - `GriffTalk`, `GriffTalkSquare`, `MouthSheet`: the first proof of concept, from a single flat still.
 
+## Hand playground
+
+`playground/hand3d.html` turns the Turntable views on the "3d HAND" artboard into an interactive hand
+(drag to turn and tilt, animate the turn, forearm guiding or following the hand). After re-exporting the
+artboard to `assets/characters/griff/hand3d/hand3d_sheet.svg`:
+
+```bash
+node scripts/hand3d.mjs assets/characters/griff/hand3d/hand3d_sheet.svg src/data/griff.rig.json playground/hand3d.data.js
+python3 -m http.server 5178 --directory playground
+```
+
 ## Layout
 
 - `src/rig/Rig.tsx`: views, joints, elbow patch, hand swaps, turns.
