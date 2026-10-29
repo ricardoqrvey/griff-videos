@@ -118,16 +118,19 @@ smoothFlat(sets.flat);
 // with forearm T - 135.
 const PAIR_OFFSET = { hang: 0, flat: -135 };
 const turnKey = (t) => (((t + 180) % 360) + 360) % 360 - 180;
-const forearms = { hang: {}, flat: {} };
+// The sheet has two grids (ids with and without a "-2" suffix). Each view
+// belongs to its grid's set; the grid whose views are mostly upright is the
+// hanging one. (Classifying view by view fails: lying forearms that point
+// up or down look upright too.)
+const grids = { first: {}, second: {} };
 for (const g of load(forearmFile).querySelectorAll("g")) {
   const m = (g.getAttribute("id") ?? "").match(/^Generative_Object_(-?\d+)_(-?\d+)_(-2)?$/);
   if (!m) continue;
   const P = g.querySelectorAll(SHAPES).flatMap(pointsOf);
-  const b = bbox(P);
-  // The grid of upright forearms is the hanging set.
-  const set = b.maxY - b.minY > (b.maxX - b.minX) * 1.3 ? "hang" : "flat";
-  forearms[set][`${m[1]},${m[2]}`] = { markup: markup(g), P, b };
+  grids[m[3] ? "second" : "first"][`${m[1]},${m[2]}`] = { markup: markup(g), P, b: bbox(P) };
 }
+const upright = (grid) => Object.values(grid).filter(({ b }) => b.maxY - b.minY > (b.maxX - b.minX) * 1.3).length;
+const forearms = upright(grids.first) > upright(grids.second) ? { hang: grids.first, flat: grids.second } : { hang: grids.second, flat: grids.first };
 const forearm3d = { hang: {}, flat: {} };
 for (const set of ["hang", "flat"]) {
   for (const [key, hand] of Object.entries(sets[set])) {
