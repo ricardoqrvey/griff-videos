@@ -137,6 +137,8 @@ function arm(group) {
   const capR = (Math.max(...nearTop) - Math.min(...nearTop)) / 2;
   const cap = [(Math.max(...nearTop) + Math.min(...nearTop)) / 2, ub.minY + capR];
   return {
+    U,
+    L,
     upper: markup(upper),
     lower: markup(lower),
     upperFill: fillMarkup(upper, true),
@@ -307,6 +309,8 @@ for (const v of BORROW.into) {
       patch: donor.patch,
       handFix,
       handTurn: round(handTurn),
+      U: donor.U.map((p) => at(mu, p)),
+      L: donor.L.map((p) => at(ml, p)),
     };
   }
   if (!BEHIND.includes(v)) {
@@ -323,8 +327,32 @@ for (const v of BORROW.into) {
   view.order = rest;
 }
 
-// Forearm direction at rest, which library hands are laid along.
-for (const view of Object.values(views)) for (const a of Object.values(view.arms)) a.forearmLean = round(lean(a.elbow, a.wrist));
+// Sleeve half-widths either side of each limb's axis, measured from the art
+// just above and just below the elbow (outline included): where the inner
+// "V" of a bent elbow falls, for the fold lines.
+function sides(points, from, dir, lo, hi) {
+  const u = [dir[0] / Math.hypot(...dir), dir[1] / Math.hypot(...dir)];
+  const near = points.filter((p) => {
+    const t = (p[0] - from[0]) * u[0] + (p[1] - from[1]) * u[1];
+    return t > lo && t < hi;
+  });
+  const cross = near.map((p) => u[0] * (p[1] - from[1]) - u[1] * (p[0] - from[0]));
+  return [round(Math.max(...cross)), round(-Math.min(...cross))]; // [left of axis (+), right (−)]
+}
+
+for (const view of Object.values(views)) {
+  for (const a of Object.values(view.arms)) {
+    // Forearm direction at rest, which library hands are laid along.
+    a.forearmLean = round(lean(a.elbow, a.wrist));
+    const up = [a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]];
+    const down = [a.wrist[0] - a.elbow[0], a.wrist[1] - a.elbow[1]];
+    a.sleeve = { upper: sides(a.U, a.elbow, up, -90, -15), lower: sides(a.L, a.elbow, down, 15, 90) };
+  }
+}
+for (const view of Object.values(views)) for (const a of Object.values(view.arms)) {
+  delete a.U;
+  delete a.L;
+}
 
 writeFileSync(outFile, JSON.stringify({ views, hands }));
 for (const [k, v] of Object.entries(views)) {

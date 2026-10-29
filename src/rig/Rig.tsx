@@ -18,6 +18,7 @@ type ArmData = {
   handTurn?: number; // and the angle that hand was turned by, for library hands
   swingIn?: boolean; // in front of the torso: the elbow bends across the body
   forearmLean: number; // forearm direction at rest, degrees from straight down
+  sleeve: { upper: [number, number]; lower: [number, number] }; // half-widths left (+) / right (−) of each axis, near the elbow
 };
 type ViewData = {
   w: number;
@@ -114,28 +115,46 @@ const turnV = (v: V, deg: number): V => {
   return [v[0] * Math.cos(t) - v[1] * Math.sin(t), v[0] * Math.sin(t) + v[1] * Math.cos(t)];
 };
 
-/** Fold lines on the inside of a bent elbow, running in from the inner corner
- *  of the bend: one crease from about 12° of bend, a second past 50°. */
+/** Fold lines on the inside of a bent elbow. The first starts right in the
+ *  "V" where the inner edges of upper arm and forearm meet (from ~12° of bend);
+ *  the second, past ~50°, floats a little further along the forearm. */
 function elbowFolds(a: ArmData, bend: number) {
   const E = a.elbow;
   const u = norm([E[0] - a.shoulder[0], E[1] - a.shoulder[1]]);
   const f = turnV(norm([a.wrist[0] - E[0], a.wrist[1] - E[1]]), bend);
-  const c = norm([f[0] - u[0], f[1] - u[1]]); // toward the inner corner
+  const c = norm([f[0] - u[0], f[1] - u[1]]); // toward the inside of the bend
   const hw = a.patch / 2.3; // half the sleeve width
-  const theta = Math.acos(Math.max(-1, Math.min(1, u[0] * f[0] + u[1] * f[1]))); // bend, radians
-  const corner = Math.min(1.7, 1 / Math.cos(theta / 2)) * hw; // inner corner distance
   const deg = Math.abs(bend);
-  const clamp = (v: number) => Math.max(0, Math.min(1, v));
-  const crease = (amount: number, shift: number) => {
-    if (amount <= 0) return null;
-    // Start just inside the corner, slid along the forearm by `shift`, and run back toward the joint.
-    const s0: V = [E[0] + c[0] * corner * 0.9 + f[0] * hw * shift, E[1] + c[1] * corner * 0.9 + f[1] * hw * shift];
-    const len = hw * (0.25 + 0.45 * amount);
-    const s1: V = [s0[0] - c[0] * len + f[0] * hw * 0.12, s0[1] - c[1] * len + f[1] * hw * 0.12];
-    const q: V = [(s0[0] + s1[0]) / 2 - f[0] * hw * 0.12, (s0[1] + s1[1]) / 2 - f[1] * hw * 0.12];
-    return `M${s0} Q${q} ${s1}`;
+  if (deg < 12) return [];
+  // Inner edges: each limb's axis pushed half a sleeve toward the inside.
+  // Push each axis out to its inner edge, using the sleeve's measured width on that side.
+  const edge = (d: V, widths: [number, number]): V => {
+    const n: V = [-d[1], d[0]]; // the "+" side of the axis
+    const plus = n[0] * c[0] + n[1] * c[1] > 0;
+    const w = plus ? widths[0] : widths[1];
+    return [E[0] + (plus ? n[0] : -n[0]) * w, E[1] + (plus ? n[1] : -n[1]) * w];
   };
-  return [crease(clamp((deg - 12) / 50), 0.15), crease(clamp((deg - 50) / 50), 0.5)].filter(Boolean) as string[];
+  const p1 = edge(u, a.sleeve.upper);
+  const p2 = edge(f, a.sleeve.lower);
+  // Intersect p1 + s·u with p2 + t·f.
+  const den = u[0] * f[1] - u[1] * f[0];
+  const sAlong = ((p2[0] - p1[0]) * f[1] - (p2[1] - p1[1]) * f[0]) / den;
+  const V: V = [p1[0] + u[0] * sAlong, p1[1] + u[1] * sAlong];
+  const clamp = (v: number) => Math.max(0, Math.min(1, v));
+  // Each crease runs from the inside edge back toward the joint, bowing toward the shoulder.
+  const crease = (start: V, amount: number) => {
+    const len = hw * (0.3 + 0.4 * amount);
+    const end: V = [start[0] - c[0] * len, start[1] - c[1] * len];
+    const q: V = [(start[0] + end[0]) / 2 - u[0] * hw * 0.1, (start[1] + end[1]) / 2 - u[1] * hw * 0.1];
+    return `M${start} Q${q} ${end}`;
+  };
+  const tuck = 2; // just inside the outline
+  const folds = [crease([V[0] - c[0] * tuck, V[1] - c[1] * tuck], clamp((deg - 12) / 50))];
+  if (deg > 50) {
+    const s2: V = [V[0] - c[0] * hw * 0.15 + f[0] * hw * 0.35, V[1] - c[1] * hw * 0.15 + f[1] * hw * 0.35];
+    folds.push(crease(s2, clamp((deg - 50) / 50) * 0.7));
+  }
+  return folds;
 }
 
 export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig" }) => {
