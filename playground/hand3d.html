@@ -120,7 +120,7 @@ function render() {
     // Hand and forearm from the same Turntable camera: join the cuff to the
     // wrist and draw whichever is nearer the camera on top.
     const hand3 = `<g transform="translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
-    const arm3 = state.showArm ? `<g transform="translate(${-f3.cuff[0]} ${-f3.cuff[1]})">${f3.markup}</g>` : "";
+    const arm3 = state.showArm ? `<g transform="scale(${D.forearm3dScale}) translate(${-f3.cuff[0]} ${-f3.cuff[1]})">${f3.markup}</g>` : "";
     $("scene").innerHTML = `<g transform="translate(0 -60) rotate(${state.arm}) scale(${flip * s} ${s})">${f3.front ? hand3 + arm3 : arm3 + hand3}</g>`;
     $("view").textContent = `mano ${state.turn}, ${state.tilt} · antebrazo ${f3.turn}, ${state.tilt}`;
     $("turn").value = state.turn;

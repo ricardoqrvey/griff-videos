@@ -169,6 +169,8 @@ const arm = rig.views["000"].arms.l;
 const data = {
   sets,
   forearm3d,
+  // The Turntable forearm came out small next to the hand.
+  forearm3dScale: 1.3,
   forearm: { markup: arm.lower, elbow: arm.elbow, wrist: arm.wrist },
   // Same scale the rig gives library hands, relative to the forearm.
   handScale: rig.views["000"].handHeight / rig.hands["turn-01"].height,
