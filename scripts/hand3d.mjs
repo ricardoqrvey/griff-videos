@@ -143,7 +143,7 @@ for (const set of ["hang", "flat"]) {
     // opening faces the camera (lying, forearm turns -135..-15, centred on -75)
     // and the hand comes out toward the viewer.
     const front = set === "hang" || !(ft > -135 && ft < -15);
-    forearm3d[set][key] = { markup: f.markup, cuff: pt(...cuff), front, turn: ft, centre: c, len: Math.max(f.b.maxX - f.b.minX, f.b.maxY - f.b.minY) };
+    forearm3d[set][key] = { markup: f.markup, cuff: pt(...cuff), front, turn: ft, centre: c, len: Math.max(f.b.maxX - f.b.minX, f.b.maxY - f.b.minY), dir: d };
   }
 }
 
@@ -160,9 +160,22 @@ for (const set of ["hang", "flat"]) {
     for (const f of row) f.cuff = pt(f.centre[0] + fx(f.turn), f.centre[1] + fy(f.turn));
   }
 }
+// Views where the cuff opening shows: the hand goes over the back of the
+// opening and under its front rim. A "mouth" ellipse (forearm art units,
+// relative to the cuff point) marks the part of the sleeve the hand covers;
+// placed at the end of the cuff to start with, then tuned in the playground.
+const OPEN_CUFF = { flat: ["-15,0", "0,0", "120,0", "135,0", "150,0"] };
+for (const [set, keys] of Object.entries(OPEN_CUFF)) {
+  for (const key of keys) {
+    const f = forearm3d[set][key];
+    const l = Math.hypot(f.dir[0], f.dir[1]);
+    f.mouth = { x: round((f.dir[0] / l) * 14), y: round((f.dir[1] / l) * 14), rx: 14, ry: 30, rot: round((Math.atan2(f.dir[1], f.dir[0]) * 180) / Math.PI) };
+  }
+}
 for (const set of Object.values(forearm3d)) for (const f of Object.values(set)) {
   delete f.centre;
   delete f.len;
+  delete f.dir;
 }
 
 // The forearm the hand hangs from: the front view's left forearm, at rest.

@@ -30,6 +30,7 @@
   .btn { padding: 7px 10px; }
   .xy { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 12px; }
   .xy input { width: 64px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px; font: inherit; }
+  [hidden] { display: none !important; }
   .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
   /* Narrow: the hand stays pinned on top while the controls scroll under it. */
   @media (max-width: 760px) {
@@ -109,6 +110,14 @@
       <div class="seg" id="target">
         <button data-v="hand" aria-pressed="true">Mano</button>
         <button data-v="arm" aria-pressed="false">Antebrazo</button>
+        <button data-v="mouth" aria-pressed="false">Boca manga</button>
+      </div>
+      <div id="mouthBox" hidden style="display:flex;flex-direction:column;gap:10px">
+        <p class="check" style="margin:0"><input id="mouthOn" type="checkbox"><label for="mouthOn" style="margin:0;color:inherit">Mano dentro de la boca en esta vista</label></p>
+        <p class="hint" style="margin:0">Dentro de la elipse verde se ve la mano (agujero y borde trasero); fuera, la manga queda encima (borde delantero).</p>
+        <div><label for="rx">Ancho</label><div class="row"><input id="rx" type="range" min="2" max="80" step="1"><output id="rxOut"></output></div></div>
+        <div><label for="ry">Alto</label><div class="row"><input id="ry" type="range" min="2" max="120" step="1"><output id="ryOut"></output></div></div>
+        <div><label for="rot">Giro</label><div class="row"><input id="rot" type="range" min="-180" max="180" step="1"><output id="rotOut"></output></div></div>
       </div>
       <div class="row" style="gap:14px;align-items:flex-start">
         <div class="pad">
@@ -150,6 +159,17 @@ let offsets = { ...(D.offsets ?? {}) };
 try { Object.assign(offsets, JSON.parse(localStorage.getItem(STORE) ?? "{}")); } catch {}
 const viewId = () => `${state.set}|${state.turn},${state.tilt}`;
 const offsetOf = (part) => offsets[viewId()]?.[part] ?? [0, 0];
+// The cuff opening ellipse for this view: the user's, else the default from the data.
+const mouthOf = (f3) => {
+  const o = offsets[viewId()]?.mouth;
+  if (o === false) return null;
+  return o ?? f3?.mouth ?? null;
+};
+function setMouth(m) {
+  const id = viewId();
+  offsets[id] = { ...(offsets[id] ?? {}), mouth: m };
+  try { localStorage.setItem(STORE, JSON.stringify(offsets)); } catch {}
+}
 function setOffset(part, d) {
   const id = viewId();
   offsets[id] = { ...(offsets[id] ?? {}), [part]: d };
@@ -179,10 +199,30 @@ function render() {
     // wrist and draw whichever is nearer the camera on top.
     const [hx, hy] = offsetOf("hand"), [ax, ay] = offsetOf("arm");
     const hand3 = `<g transform="translate(${hx} ${hy}) translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
-    const arm3 = state.showArm ? `<g transform="translate(${ax} ${ay}) scale(${D.forearm3dScale[state.set]}) translate(${-f3.cuff[0]} ${-f3.cuff[1]})">${f3.markup}</g>` : "";
-    $("scene").innerHTML = `<g transform="translate(0 -60) rotate(${state.arm}) scale(${flip * s} ${s})">${f3.front ? hand3 + arm3 : arm3 + hand3}</g>`;
+    const armT = `translate(${ax} ${ay}) scale(${D.forearm3dScale[state.set]}) translate(${-f3.cuff[0]} ${-f3.cuff[1]})`;
+    const arm3 = state.showArm ? `<g transform="${armT}">${f3.markup}</g>` : "";
+    const mouth = mouthOf(f3);
+    let layers = f3.front ? hand3 + arm3 : arm3 + hand3;
+    let guide = "";
+    if (mouth) {
+      // Sleeve under the hand, hand, then the sleeve again over it except
+      // inside the mouth ellipse: the hand shows through the opening and its
+      // back rim, and stays under the front rim.
+      const ex = f3.cuff[0] + mouth.x, ey = f3.cuff[1] + mouth.y;
+      const ellipse = (attrs) => `<ellipse cx="${ex}" cy="${ey}" rx="${mouth.rx}" ry="${mouth.ry}" transform="rotate(${mouth.rot} ${ex} ${ey})" ${attrs}/>`;
+      const mask = `<mask id="mouth" maskUnits="userSpaceOnUse" x="-20000" y="-20000" width="40000" height="40000"><rect x="-20000" y="-20000" width="40000" height="40000" fill="#fff"/>${ellipse('fill="#000"')}</mask>`;
+      layers = state.showArm ? `${arm3}${hand3}<g transform="${armT}" mask="url(#mouth)">${mask}${f3.markup}</g>` : hand3;
+      if (state.target === "mouth") guide = `<g transform="${armT}">${ellipse('fill="none" stroke="#35E06A" stroke-width="2" stroke-dasharray="5 4"')}</g>`;
+    }
+    $("scene").innerHTML = `<g transform="translate(0 -60) rotate(${state.arm}) scale(${flip * s} ${s})">${layers}${guide}</g>`;
+    $("mouthBox").hidden = state.target !== "mouth";
+    $("mouthOn").checked = !!mouth;
+    for (const k of ["rx", "ry", "rot"]) {
+      $(k).disabled = !mouth;
+      if (mouth) { $(k).value = mouth[k]; $(k + "Out").textContent = Math.round(mouth[k]); }
+    }
     $("view").textContent = `mano ${state.turn}, ${state.tilt} · antebrazo ${f3.turn}, ${state.tilt}`;
-    const [dx, dy] = offsetOf(state.target);
+    const [dx, dy] = state.target === "mouth" ? (mouth ? [mouth.x, mouth.y] : [0, 0]) : offsetOf(state.target);
     $("dx").value = dx;
     $("dy").value = dy;
     $("count").textContent = `${Object.keys(offsets).length} vistas ajustadas`;
@@ -244,7 +284,15 @@ segmented("forearm", "forearm");
 segmented("target", "target");
 segmented("step", "step", Number);
 
+const currentMouth = () => mouthOf(D.forearm3d[state.set]?.[`${state.turn},${state.tilt}`]);
 const nudge = (dx, dy) => {
+  if (state.target === "mouth") {
+    const m = currentMouth();
+    if (!m) return;
+    setMouth({ ...m, x: m.x + dx * state.step, y: m.y + dy * state.step });
+    render();
+    return;
+  }
   const [x, y] = offsetOf(state.target);
   setOffset(state.target, dx === 0 && dy === 0 ? [0, 0] : [x + dx * state.step, y + dy * state.step]);
   render();
@@ -255,8 +303,28 @@ $("adjust").querySelector(".pad").addEventListener("click", (e) => {
   const [dx, dy] = b.dataset.d.split(",").map(Number);
   nudge(dx, dy);
 });
+for (const k of ["rx", "ry", "rot"]) {
+  $(k).addEventListener("input", () => {
+    const m = currentMouth();
+    if (!m) return;
+    setMouth({ ...m, [k]: Number($(k).value) });
+    render();
+  });
+}
+$("mouthOn").addEventListener("change", (e) => {
+  const f3 = D.forearm3d[state.set]?.[`${state.turn},${state.tilt}`];
+  // Turning it on starts from the data's default, or a small ellipse at the cuff.
+  setMouth(e.target.checked ? f3?.mouth ?? { x: 0, y: 0, rx: 14, ry: 30, rot: 0 } : false);
+  render();
+});
 for (const id of ["dx", "dy"]) {
   $(id).addEventListener("change", () => {
+    if (state.target === "mouth") {
+      const m = currentMouth();
+      if (m) setMouth({ ...m, x: Number($("dx").value) || 0, y: Number($("dy").value) || 0 });
+      render();
+      return;
+    }
     setOffset(state.target, [Number($("dx").value) || 0, Number($("dy").value) || 0]);
     render();
   });
