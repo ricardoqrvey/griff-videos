@@ -138,11 +138,30 @@ for (const set of ["hang", "flat"]) {
     // The cuff is the end of the forearm in the direction the hand points.
     const d = set === "hang" ? [0, 1] : [hand.tips[0] - hand.wrist[0], hand.tips[1] - hand.wrist[1]];
     const cuff = endCentre(f.P, c, [c[0] + d[0], c[1] + d[1]], 12, 22);
-    // Lying, forearm turns around 105 (15..195) put the elbow toward the camera:
-    // the forearm is in front of the hand. Hanging, the cuff covers the wrist.
-    const front = set === "hang" || ft > 15 || ft < -165;
-    forearm3d[set][key] = { markup: f.markup, cuff: pt(...cuff), front, turn: ft };
+    // The cuff wraps the wrist, so the forearm draws on top, except while its
+    // opening faces the camera (lying, forearm turns -135..-15, centred on -75)
+    // and the hand comes out toward the viewer.
+    const front = set === "hang" || !(ft > -135 && ft < -15);
+    forearm3d[set][key] = { markup: f.markup, cuff: pt(...cuff), front, turn: ft, centre: c, len: Math.max(f.b.maxX - f.b.minX, f.b.maxY - f.b.minY) };
   }
+}
+
+// Same smoothing for the cuff of the lying forearm: a fit over its own turns,
+// weighted toward the views where the forearm is seen full length.
+{
+  const views = Object.entries(forearm3d.flat).map(([k, f]) => [Number(k.split(",")[1]), f]);
+  const longest = Math.max(...views.map(([, f]) => f.len));
+  for (const tilt of [-30, 0, 30]) {
+    const row = views.filter(([tl]) => tl === tilt).map(([, f]) => f);
+    const weight = (f) => Math.max(0.05, f.len / longest) ** 4;
+    const fit = (pick) => fitTurns(row.map((f) => ({ theta: f.turn, value: pick(f), weight: weight(f) })));
+    const fx = fit((f) => f.cuff[0] - f.centre[0]), fy = fit((f) => f.cuff[1] - f.centre[1]);
+    for (const f of row) f.cuff = pt(f.centre[0] + fx(f.turn), f.centre[1] + fy(f.turn));
+  }
+}
+for (const set of Object.values(forearm3d)) for (const f of Object.values(set)) {
+  delete f.centre;
+  delete f.len;
 }
 
 // The forearm the hand hangs from: the front view's left forearm, at rest.
