@@ -61,7 +61,14 @@
       <div class="row"><input id="arm" type="range" min="-180" max="180" step="1" value="0"><output id="armOut">0°</output></div>
     </div>
     <div>
-      <label>El antebrazo…</label>
+      <label>Antebrazo</label>
+      <div class="seg" id="forearm">
+        <button data-v="3d" aria-pressed="true">3D (Turntable)</button>
+        <button data-v="flat" aria-pressed="false">Plano (rig)</button>
+      </div>
+    </div>
+    <div id="modeBox" hidden>
+      <label>El antebrazo plano…</label>
       <div class="seg" id="mode">
         <button data-v="hand" aria-pressed="false">guía la mano</button>
         <button data-v="arm" aria-pressed="true">sigue la mano</button>
@@ -91,7 +98,7 @@
 <script>
 const D = window.HAND3D;
 const $ = (id) => document.getElementById(id);
-const state = { set: "hang", turn: 0, tilt: 0, arm: 0, mode: "arm", showArm: true, mirror: false, play: "off", speed: 90 };
+const state = { set: "hang", turn: 0, tilt: 0, arm: 0, forearm: "3d", mode: "arm", showArm: true, mirror: false, play: "off", speed: 90 };
 
 // Longest wrist-to-fingertips distance in each set: the "not foreshortened" length.
 const axisLen = (v) => Math.hypot(v.tips[0] - v.wrist[0], v.tips[1] - v.wrist[1]);
@@ -102,10 +109,25 @@ const fa = D.forearm;
 const forearmLean = lean(fa.wrist[0] - fa.elbow[0], fa.wrist[1] - fa.elbow[1]);
 
 function render() {
-  const v = D.sets[state.set][`${state.turn},${state.tilt}`];
+  const key = `${state.turn},${state.tilt}`;
+  const v = D.sets[state.set][key];
   if (!v) return;
   const flip = state.mirror ? -1 : 1;
   const s = D.handScale;
+  $("modeBox").hidden = state.forearm === "3d";
+  const f3 = D.forearm3d[state.set][key];
+  if (state.forearm === "3d" && f3) {
+    // Hand and forearm from the same Turntable camera: join the cuff to the
+    // wrist and draw whichever is nearer the camera on top.
+    const hand3 = `<g transform="translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
+    const arm3 = state.showArm ? `<g transform="translate(${-f3.cuff[0]} ${-f3.cuff[1]})">${f3.markup}</g>` : "";
+    $("scene").innerHTML = `<g transform="translate(0 -60) rotate(${state.arm}) scale(${flip * s} ${s})">${f3.front ? hand3 + arm3 : arm3 + hand3}</g>`;
+    $("view").textContent = `mano ${state.turn}, ${state.tilt} · antebrazo ${f3.turn}, ${state.tilt}`;
+    $("turn").value = state.turn;
+    $("turnOut").textContent = `${state.turn}°`;
+    $("armOut").textContent = `${state.arm}°`;
+    return;
+  }
   // Hand axis (wrist → fingertips) after mirroring.
   const ax = [(v.tips[0] - v.wrist[0]) * flip, v.tips[1] - v.wrist[1]];
   const handLean = lean(ax[0], ax[1]);
@@ -153,6 +175,7 @@ const setPressed = (id, value) => {
 segmented("set", "set");
 segmented("tilt", "tilt", Number);
 segmented("mode", "mode");
+segmented("forearm", "forearm");
 segmented("play", "play");
 $("turn").addEventListener("input", (e) => { state.turn = Number(e.target.value); render(); });
 $("arm").addEventListener("input", (e) => { state.arm = Number(e.target.value); render(); });

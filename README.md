@@ -39,12 +39,13 @@ Lipsync uses [Rhubarb Lip Sync](https://github.com/DanielSWolf/rhubarb-lip-sync)
 
 ## Hand playground
 
-`playground/hand3d.html` turns the Turntable views on the "3d HAND" artboard into an interactive hand
+`playground/hand3d.html` turns the Turntable views on the "3d HAND" and "3D Antebrazo" artboards into an interactive hand and forearm
 (drag to turn and tilt, animate the turn, forearm guiding or following the hand). After re-exporting the
 artboard to `assets/characters/griff/hand3d/hand3d_sheet.svg`:
 
 ```bash
-node scripts/hand3d.mjs assets/characters/griff/hand3d/hand3d_sheet.svg src/data/griff.rig.json playground/hand3d.data.js
+node scripts/hand3d.mjs assets/characters/griff/hand3d/hand3d_sheet.svg assets/characters/griff/hand3d/forearm3d_sheet.svg \
+  src/data/griff.rig.json playground/hand3d.data.js
 python3 -m http.server 5178 --directory playground
 ```
 
