@@ -9,7 +9,8 @@
 // the fingers toward or away from the camera). Each view is named by its
 // Turntable (turn, tilt) angles. The "3D Antebrazo" artboard has the same two
 // sets for the forearm.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { parse } from "node-html-parser";
 import { bbox, endCentre, markup, pointsOf, pt, round, SHAPES } from "./svg-geometry.mjs";
 
@@ -169,8 +170,12 @@ const arm = rig.views["000"].arms.l;
 const data = {
   sets,
   forearm3d,
-  // The Turntable forearm came out small next to the hand.
-  forearm3dScale: 1.3,
+  // The Turntable forearms came out small next to the hand.
+  forearm3dScale: { hang: 1.3, flat: 1.56 },
+  // Per-view placement done by hand in the playground (offsets.json next to the sheet).
+  offsets: existsSync(join(dirname(sheetFile), "offsets.json"))
+    ? JSON.parse(readFileSync(join(dirname(sheetFile), "offsets.json"), "utf8"))
+    : {},
   forearm: { markup: arm.lower, elbow: arm.elbow, wrist: arm.wrist },
   // Same scale the rig gives library hands, relative to the forearm.
   handScale: rig.views["000"].handHeight / rig.hands["turn-01"].height,

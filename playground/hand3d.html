@@ -179,7 +179,7 @@ function render() {
     // wrist and draw whichever is nearer the camera on top.
     const [hx, hy] = offsetOf("hand"), [ax, ay] = offsetOf("arm");
     const hand3 = `<g transform="translate(${hx} ${hy}) translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
-    const arm3 = state.showArm ? `<g transform="translate(${ax} ${ay}) scale(${D.forearm3dScale}) translate(${-f3.cuff[0]} ${-f3.cuff[1]})">${f3.markup}</g>` : "";
+    const arm3 = state.showArm ? `<g transform="translate(${ax} ${ay}) scale(${D.forearm3dScale[state.set]}) translate(${-f3.cuff[0]} ${-f3.cuff[1]})">${f3.markup}</g>` : "";
     $("scene").innerHTML = `<g transform="translate(0 -60) rotate(${state.arm}) scale(${flip * s} ${s})">${f3.front ? hand3 + arm3 : arm3 + hand3}</g>`;
     $("view").textContent = `mano ${state.turn}, ${state.tilt} · antebrazo ${f3.turn}, ${state.tilt}`;
     const [dx, dy] = offsetOf(state.target);
