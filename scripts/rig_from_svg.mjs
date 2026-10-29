@@ -192,6 +192,7 @@ for (const file of readdirSync(dir).sort()) {
       arms,
       neck: pt((head.minX + head.maxX) / 2, head.maxY - (head.maxY - head.minY) * 0.22),
       anchorX: round((torso.minX + torso.maxX) / 2),
+      waist: pt((torso.minX + torso.maxX) / 2, torso.maxY - 60),
       ground: round(legs.maxY),
       handHeight: round(handHeight),
     };

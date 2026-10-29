@@ -27,6 +27,7 @@ type ViewData = {
   arms: Record<string, ArmData>;
   neck: Pt;
   anchorX: number;
+  waist: Pt;
   ground: number;
   handHeight: number;
 };
@@ -69,6 +70,9 @@ export type RigPose = {
   arms: { l?: ArmPose; r?: ArmPose; near?: ArmPose }; // screen sides
   head?: { tilt?: number; nod?: number };
   face?: FacePose;
+  /** Upper body: lift (px up, a shrug) and lean (degrees, tilting from the waist,
+   *  which raises one shoulder; vest, sleeves and head go with it). */
+  body?: { lift?: number; lean?: number };
 };
 
 export const STAGE_W = 1000;
@@ -98,6 +102,42 @@ const Svg: React.FC<{ markup: string; transform?: string; clipPath?: string }> =
   <g transform={transform} clipPath={clipPath} dangerouslySetInnerHTML={{ __html: markup }} />
 );
 
+const white = (markup: string) => markup.replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="#fff"');
+
+type V = [number, number];
+const norm = (v: V): V => {
+  const l = Math.hypot(v[0], v[1]) || 1;
+  return [v[0] / l, v[1] / l];
+};
+const turnV = (v: V, deg: number): V => {
+  const t = (deg * Math.PI) / 180;
+  return [v[0] * Math.cos(t) - v[1] * Math.sin(t), v[0] * Math.sin(t) + v[1] * Math.cos(t)];
+};
+
+/** Fold lines on the inside of a bent elbow, running in from the inner corner
+ *  of the bend: one crease from about 12° of bend, a second past 50°. */
+function elbowFolds(a: ArmData, bend: number) {
+  const E = a.elbow;
+  const u = norm([E[0] - a.shoulder[0], E[1] - a.shoulder[1]]);
+  const f = turnV(norm([a.wrist[0] - E[0], a.wrist[1] - E[1]]), bend);
+  const c = norm([f[0] - u[0], f[1] - u[1]]); // toward the inner corner
+  const hw = a.patch / 2.3; // half the sleeve width
+  const theta = Math.acos(Math.max(-1, Math.min(1, u[0] * f[0] + u[1] * f[1]))); // bend, radians
+  const corner = Math.min(1.7, 1 / Math.cos(theta / 2)) * hw; // inner corner distance
+  const deg = Math.abs(bend);
+  const clamp = (v: number) => Math.max(0, Math.min(1, v));
+  const crease = (amount: number, shift: number) => {
+    if (amount <= 0) return null;
+    // Start just inside the corner, slid along the forearm by `shift`, and run back toward the joint.
+    const s0: V = [E[0] + c[0] * corner * 0.9 + f[0] * hw * shift, E[1] + c[1] * corner * 0.9 + f[1] * hw * shift];
+    const len = hw * (0.25 + 0.45 * amount);
+    const s1: V = [s0[0] - c[0] * len + f[0] * hw * 0.12, s0[1] - c[1] * len + f[1] * hw * 0.12];
+    const q: V = [(s0[0] + s1[0]) / 2 - f[0] * hw * 0.12, (s0[1] + s1[1]) / 2 - f[1] * hw * 0.12];
+    return `M${s0} Q${q} ${s1}`;
+  };
+  return [crease(clamp((deg - 12) / 50), 0.15), crease(clamp((deg - 50) / 50), 0.5)].filter(Boolean) as string[];
+}
+
 export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig" }) => {
   const { src, mirror } = SOURCE[pose.view];
   const view = RIG.views[src];
@@ -112,7 +152,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const sh = `rotate(${p.shoulder * s.sh} ${a.shoulder[0]} ${a.shoulder[1]})`;
     const el = `rotate(${p.elbow * s.el} ${a.elbow[0]} ${a.elbow[1]})`;
     const wr = `rotate(${(p.wrist ?? 0) * s.el} ${a.wrist[0]} ${a.wrist[1]})`;
-    return { a, p, sh, el, wr };
+    return { a, p, sh, el, wr, bend: p.elbow * s.el };
   };
 
   const libHand = (side: string, a: ArmData, p: ArmPose) => {
@@ -133,7 +173,9 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
   };
 
   const head = pose.head ?? {};
-  const neck = view.neck;
+  // Everything above the legs rides the body lift and lean.
+  const body = pose.body ?? {};
+  const bodyT = `translate(0 ${-(body.lift ?? 0)}) rotate(${body.lean ?? 0} ${view.waist[0]} ${view.waist[1]})`;
 
   return (
     <svg viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} width="100%" height="100%" overflow="visible">
@@ -144,7 +186,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
         if (name === "head") {
           const hn = headSrc.neck;
           return (
-            <g key={name} transform={viewTransform(headView)}>
+            <g key={name} transform={`${viewTransform(headView)} ${bodyT}`}>
               <g transform={`translate(0 ${head.nod ?? 0}) rotate(${head.tilt ?? 0} ${hn[0]} ${hn[1]})`}>
                 <Svg markup={headSrc.pieces.head} />
                 {headSrc.pieces.glare && (
@@ -163,10 +205,12 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
         }
         if (name.startsWith("arm-")) {
           const side = name.slice(4);
-          const { a, sh, el } = armChain(side);
+          const { a, sh, el, bend } = armChain(side);
           const clip = `${id}-elbow-${side}`;
+          const sleeve = `${id}-sleeve-${side}`;
+          const folds = elbowFolds(a, bend);
           return (
-            <g key={name} transform={vt}>
+            <g key={name} transform={`${vt} ${bodyT}`}>
               <g transform={sh}>
                 <Svg markup={a.upper} />
                 <Svg markup={a.lower} transform={el} />
@@ -179,6 +223,20 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
                   <Svg markup={a.upperFill} />
                   <Svg markup={a.lowerFill} transform={el} />
                 </g>
+                {folds.length > 0 && (
+                  <>
+                    {/* A mask, not a clipPath: the fills come wrapped in groups. */}
+                    <mask id={sleeve} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
+                      <g dangerouslySetInnerHTML={{ __html: white(a.upperFill) }} />
+                      <g transform={el} dangerouslySetInnerHTML={{ __html: white(a.lowerFill) }} />
+                    </mask>
+                    <g mask={`url(#${sleeve})`} fill="none" stroke="#111" strokeWidth={5} strokeLinecap="round">
+                      {folds.map((d) => (
+                        <path key={d} d={d} />
+                      ))}
+                    </g>
+                  </>
+                )}
               </g>
             </g>
           );
@@ -187,12 +245,12 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
           const side = name.slice(5);
           const { a, p, sh, el, wr } = armChain(side);
           return (
-            <g key={name} transform={`${vt} ${sh} ${el} ${wr}`}>
+            <g key={name} transform={`${vt} ${bodyT} ${sh} ${el} ${wr}`}>
               {p.hand ? libHand(side, a, p) : <Svg markup={view.pieces[name]} transform={a.handFix} />}
             </g>
           );
         }
-        return <Svg key={name} markup={view.pieces[name]} transform={vt} />;
+        return <Svg key={name} markup={view.pieces[name]} transform={name === "legs" ? vt : `${vt} ${bodyT}`} />;
       })}
     </svg>
   );

@@ -72,37 +72,42 @@ const RIGHT: ArmKey[] = [
   key(w("embedded", 1), low(5, 32)),
 ];
 
-// Brows (px up; negative frowns) and head (degrees tilt, px nod), per beat.
-type Face = { l: number; r: number; tilt: number; nod: number };
+// Per beat: brows (height l/r; shape la/ra = arch, li/ri = inner end), head
+// (tilt degrees, nod px) and shoulders (lift px = shrug, lean degrees from the
+// waist = one shoulder higher). Unset values are 0.
+type Face = { l: number; r: number; la?: number; li?: number; ra?: number; ri?: number; tilt?: number; nod?: number; lift?: number; lean?: number };
 const FACE: [number, Face][] = [
-  [0, { l: 5, r: 5, tilt: 0, nod: 0 }],
-  [w("adorable"), { l: -3, r: 12, tilt: -4, nod: 0 }], // skeptical
-  [w("good"), { l: 8, r: 8, tilt: -2, nod: -3 }], // shrug
-  [w("build"), { l: 12, r: 12, tilt: 3, nod: 0 }], // question
-  [w("sure"), { l: 0, r: 8, tilt: 0, nod: 0 }], // sarcasm
-  [w("until"), { l: -4, r: -4, tilt: -3, nod: 2 }], // deadpan
-  [w("or"), { l: 2, r: 2, tilt: 0, nod: 0 }],
-  [w("goatiq"), { l: 10, r: 10, tilt: 2, nod: -3 }], // the answer
-  [w("plug"), { l: 3, r: 3, tilt: 0, nod: 0 }],
-  [w("done"), { l: 6, r: 6, tilt: 0, nod: -4 }],
-  [w("no"), { l: 2, r: 2, tilt: -2, nod: 0 }], // "no ... no ..." small shake
-  [w("no", 1), { l: 2, r: 8, tilt: 2, nod: 0 }],
-  [w("live"), { l: 8, r: 8, tilt: 0, nod: 0 }],
-  [w("embedded"), { l: 3, r: 3, tilt: 0, nod: 0 }],
-  [w("30"), { l: 10, r: 10, tilt: 2, nod: -2 }],
-  [w("no", 2), { l: -5, r: -5, tilt: 0, nod: 3 }], // no excuses
-  [w("goatiq", 1), { l: 10, r: 10, tilt: -2, nod: -3 }],
-  [w("ai-powered"), { l: 5, r: 5, tilt: 0, nod: 0 }],
+  [0, { l: 5, r: 5, la: 2, ra: 2 }],
+  [w("adorable"), { l: -3, r: 12, la: -3, li: -2, ra: 6, tilt: -4, lean: 1.2 }], // skeptical
+  [w("good"), { l: 8, r: 8, li: 6, ri: 6, tilt: -2, nod: -3, lift: 7 }], // shrug, ironic
+  [w("build"), { l: 12, r: 12, la: 5, ra: 5, li: 2, ri: 2, tilt: 3, lift: 2 }], // question
+  [w("sure"), { l: 0, r: 8, li: -2, ra: 5, lean: -1 }], // sarcasm
+  [w("dashboards"), { l: 4, r: 4, la: 1, ra: 1 }],
+  [w("until"), { l: -4, r: -4, la: -2, ra: -2, li: -4, ri: -4, tilt: -3, nod: 2, lift: -2 }], // deadpan
+  [w("or"), { l: 2, r: 2 }],
+  [w("goatiq"), { l: 10, r: 10, la: 6, ra: 6, tilt: 2, nod: -3, lift: 3 }], // the answer
+  [w("plug"), { l: 3, r: 3, la: 2, ra: 2 }],
+  [w("done"), { l: 6, r: 6, la: 3, ra: 3, li: 2, ri: 2, nod: -4, lean: 1.5 }], // pleased
+  [w("no"), { l: 2, r: 2, li: -2, ri: -2, tilt: -2 }], // "no ... no ..." small shake
+  [w("no", 1), { l: 2, r: 8, ra: 5, tilt: 2 }],
+  [w("live"), { l: 8, r: 8, la: 4, ra: 4, lift: 2 }],
+  [w("not"), { l: 2, r: 6, li: -2, ra: 3 }], // wry
+  [w("embedded"), { l: 3, r: 3 }],
+  [w("30"), { l: 10, r: 10, la: 5, ra: 5, tilt: 2, nod: -2, lift: 3 }],
+  [w("no", 2), { l: -5, r: -5, la: -3, ra: -3, li: -6, ri: -6, nod: 3, lift: -1 }], // no excuses
+  [w("goatiq", 1), { l: 10, r: 10, la: 6, ra: 6, li: 2, ri: 2, tilt: -2, nod: -3, lift: 4, lean: -1 }], // proud
+  [w("ai-powered"), { l: 5, r: 5, la: 3, ra: 3, lift: 1 }],
+  [w("embedded", 1), { l: 6, r: 6, la: 3, ra: 3, li: 3, ri: 3, lift: 5 }], // open-handed close
 ];
 
-const faceAt = (t: number): Face => {
+const KEYS = ["l", "r", "la", "li", "ra", "ri", "tilt", "nod", "lift", "lean"] as const;
+const faceAt = (t: number): Required<Face> => {
   let i = 0;
   while (i + 1 < FACE.length && FACE[i + 1][0] <= t) i++;
   const [at, cur] = FACE[i];
   const prev = FACE[Math.max(0, i - 1)][1];
-  const k = interpolate(t, [at, at + 0.25], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) });
-  const mix = (a: number, b: number) => a + (b - a) * k;
-  return { l: mix(prev.l, cur.l), r: mix(prev.r, cur.r), tilt: mix(prev.tilt, cur.tilt), nod: mix(prev.nod, cur.nod) };
+  const k = interpolate(t, [at, at + 0.3], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) });
+  return Object.fromEntries(KEYS.map((n) => [n, (prev[n] ?? 0) + ((cur[n] ?? 0) - (prev[n] ?? 0)) * k])) as Required<Face>;
 };
 
 // A slow drift at shoulder and elbow so the arms never freeze (the wrist stays straight).
@@ -124,7 +129,13 @@ export const GriffPresent: React.FC = () => {
     view: "000" as const,
     arms: { l: idle(armAt(frame, fps, LEFT), t, 0), r: idle(armAt(frame, fps, RIGHT), t, 2) },
     head: { tilt: face.tilt + Math.sin(t * 0.8) * 0.6, nod: face.nod + Math.sin(t * 2.1) * 0.8 },
-    face: { mouth: shapeAt(t), brows: { l: face.l, r: face.r } },
+    face: {
+      mouth: shapeAt(t),
+      brows: { l: face.l, r: face.r },
+      browShape: { l: { arch: face.la, inner: face.li }, r: { arch: face.ra, inner: face.ri } },
+    },
+    // Breathing under the shrugs and leans.
+    body: { lift: face.lift + Math.sin(t * 1.6) * 1, lean: face.lean },
   };
 
   // Waist up: horn tips to just below the jacket hem, with room for the hands at the sides.
