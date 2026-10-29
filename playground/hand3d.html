@@ -24,7 +24,19 @@
   .check { display: flex; gap: 8px; align-items: center; color: var(--text); font-size: 13px; margin: 0 0 6px; }
   .check input { accent-color: var(--accent); }
   #view { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
-  @media (max-width: 760px) { main { grid-template-columns: 1fr; } #stage { height: 60vh; } aside { border-left: 0; border-top: 1px solid var(--line); } }
+  .pad { display: grid; grid-template-columns: repeat(3, 40px); gap: 4px; justify-content: start; }
+  .pad button, .btn { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 0; font: inherit; cursor: pointer; }
+  .pad button:hover, .btn:hover { border-color: var(--accent); }
+  .btn { padding: 7px 10px; }
+  .xy { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 12px; }
+  .xy input { width: 64px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px; font: inherit; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  /* Narrow: the hand stays pinned on top while the controls scroll under it. */
+  @media (max-width: 760px) {
+    main { grid-template-columns: 1fr; }
+    #stage { height: 45vh; position: sticky; top: 0; z-index: 1; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+  }
 </style>
 </head>
 <body>
@@ -92,13 +104,59 @@
       <div class="row"><input id="speed" type="range" min="15" max="360" step="15" value="90"><output id="speedOut">90°/s</output></div>
     </div>
     <div>Vista: <span id="view">0, 0</span></div>
+    <div class="card" id="adjust">
+      <label style="margin:0">Ajustar posición en esta vista</label>
+      <div class="seg" id="target">
+        <button data-v="hand" aria-pressed="true">Mano</button>
+        <button data-v="arm" aria-pressed="false">Antebrazo</button>
+      </div>
+      <div class="row" style="gap:14px;align-items:flex-start">
+        <div class="pad">
+          <span></span><button data-d="0,-1" aria-label="Arriba">↑</button><span></span>
+          <button data-d="-1,0" aria-label="Izquierda">←</button><button data-d="0,0" aria-label="Centrar">·</button><button data-d="1,0" aria-label="Derecha">→</button>
+          <span></span><button data-d="0,1" aria-label="Abajo">↓</button><span></span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="xy">X <input id="dx" type="number" step="1" value="0"></div>
+          <div class="xy">Y <input id="dy" type="number" step="1" value="0"></div>
+        </div>
+      </div>
+      <div>
+        <label>Paso</label>
+        <div class="seg" id="step">
+          <button data-v="1" aria-pressed="true">1</button>
+          <button data-v="5" aria-pressed="false">5</button>
+          <button data-v="15" aria-pressed="false">15</button>
+        </div>
+      </div>
+      <p class="hint" style="margin:0">Shift + flechas también mueve. "·" vuelve al punto calculado. Los ajustes se guardan solos por vista.</p>
+      <div class="row" style="flex-wrap:wrap">
+        <button class="btn" id="copy">Copiar ajustes</button>
+        <span class="hint" id="count" style="margin:0"></span>
+      </div>
+    </div>
   </aside>
 </main>
 <script src="hand3d.data.js"></script>
 <script>
 const D = window.HAND3D;
 const $ = (id) => document.getElementById(id);
-const state = { set: "hang", turn: 0, tilt: 0, arm: 0, forearm: "3d", mode: "arm", showArm: true, mirror: false, play: "off", speed: 90 };
+const state = { set: "hang", turn: 0, tilt: 0, arm: 0, forearm: "3d", mode: "arm", showArm: true, mirror: false, play: "off", speed: 90, target: "hand", step: 1 };
+
+// Hand-placed nudges per view, in art units: { "hang|0,0": { hand: [dx, dy], arm: [dx, dy] } }.
+// Baked ones ship in the data; edits made here are kept in this browser.
+const STORE = "hand3d-offsets-v1";
+let offsets = { ...(D.offsets ?? {}) };
+try { Object.assign(offsets, JSON.parse(localStorage.getItem(STORE) ?? "{}")); } catch {}
+const viewId = () => `${state.set}|${state.turn},${state.tilt}`;
+const offsetOf = (part) => offsets[viewId()]?.[part] ?? [0, 0];
+function setOffset(part, d) {
+  const id = viewId();
+  offsets[id] = { ...(offsets[id] ?? {}), [part]: d };
+  if (!d[0] && !d[1]) delete offsets[id][part];
+  if (!Object.keys(offsets[id]).length) delete offsets[id];
+  try { localStorage.setItem(STORE, JSON.stringify(offsets)); } catch {}
+}
 
 // Longest wrist-to-fingertips distance in each set: the "not foreshortened" length.
 const axisLen = (v) => Math.hypot(v.tips[0] - v.wrist[0], v.tips[1] - v.wrist[1]);
@@ -119,15 +177,22 @@ function render() {
   if (state.forearm === "3d" && f3) {
     // Hand and forearm from the same Turntable camera: join the cuff to the
     // wrist and draw whichever is nearer the camera on top.
-    const hand3 = `<g transform="translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
-    const arm3 = state.showArm ? `<g transform="scale(${D.forearm3dScale}) translate(${-f3.cuff[0]} ${-f3.cuff[1]})">${f3.markup}</g>` : "";
+    const [hx, hy] = offsetOf("hand"), [ax, ay] = offsetOf("arm");
+    const hand3 = `<g transform="translate(${hx} ${hy}) translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
+    const arm3 = state.showArm ? `<g transform="translate(${ax} ${ay}) scale(${D.forearm3dScale}) translate(${-f3.cuff[0]} ${-f3.cuff[1]})">${f3.markup}</g>` : "";
     $("scene").innerHTML = `<g transform="translate(0 -60) rotate(${state.arm}) scale(${flip * s} ${s})">${f3.front ? hand3 + arm3 : arm3 + hand3}</g>`;
     $("view").textContent = `mano ${state.turn}, ${state.tilt} · antebrazo ${f3.turn}, ${state.tilt}`;
+    const [dx, dy] = offsetOf(state.target);
+    $("dx").value = dx;
+    $("dy").value = dy;
+    $("count").textContent = `${Object.keys(offsets).length} vistas ajustadas`;
+    $("adjust").hidden = false;
     $("turn").value = state.turn;
     $("turnOut").textContent = `${state.turn}°`;
     $("armOut").textContent = `${state.arm}°`;
     return;
   }
+  $("adjust").hidden = true;
   // Hand axis (wrist → fingertips) after mirroring.
   const ax = [(v.tips[0] - v.wrist[0]) * flip, v.tips[1] - v.wrist[1]];
   const handLean = lean(ax[0], ax[1]);
@@ -176,6 +241,31 @@ segmented("set", "set");
 segmented("tilt", "tilt", Number);
 segmented("mode", "mode");
 segmented("forearm", "forearm");
+segmented("target", "target");
+segmented("step", "step", Number);
+
+const nudge = (dx, dy) => {
+  const [x, y] = offsetOf(state.target);
+  setOffset(state.target, dx === 0 && dy === 0 ? [0, 0] : [x + dx * state.step, y + dy * state.step]);
+  render();
+};
+$("adjust").querySelector(".pad").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const [dx, dy] = b.dataset.d.split(",").map(Number);
+  nudge(dx, dy);
+});
+for (const id of ["dx", "dy"]) {
+  $(id).addEventListener("change", () => {
+    setOffset(state.target, [Number($("dx").value) || 0, Number($("dy").value) || 0]);
+    render();
+  });
+}
+$("copy").addEventListener("click", async () => {
+  const text = JSON.stringify(offsets, null, 1);
+  try { await navigator.clipboard.writeText(text); $("copy").textContent = "Copiado"; } catch { $("copy").textContent = "No se pudo copiar"; }
+  setTimeout(() => ($("copy").textContent = "Copiar ajustes"), 1500);
+});
 segmented("play", "play");
 $("turn").addEventListener("input", (e) => { state.turn = Number(e.target.value); render(); });
 $("arm").addEventListener("input", (e) => { state.arm = Number(e.target.value); render(); });
@@ -196,6 +286,12 @@ $("stage").addEventListener("pointermove", (e) => {
 });
 $("stage").addEventListener("pointerup", () => (drag = null));
 window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" && e.target.type === "number") return;
+  if (e.shiftKey && e.key.startsWith("Arrow")) {
+    e.preventDefault();
+    nudge(e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0, e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0);
+    return;
+  }
   if (e.key === "ArrowLeft") state.turn = wrap(state.turn - 15);
   else if (e.key === "ArrowRight") state.turn = wrap(state.turn + 15);
   else if (e.key === "ArrowUp") state.tilt = Math.min(30, state.tilt + 30);
