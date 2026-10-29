@@ -50,6 +50,66 @@ for (const g of root.querySelectorAll("g")) {
   };
 }
 
+// Turning around a vertical axis moves any fixed point of the hand along a
+// smooth curve. Detection per view jumps where the hand is foreshortened
+// (fingers toward or away from the camera), so in the lying set the wrist and
+// fingertip positions (relative to each view's box) are replaced by a fit of
+// that curve over the 25 turns of each tilt: a0 + a1·cos θ + b1·sin θ +
+// a2·cos 2θ + b2·sin 2θ, weighted toward the views where the hand is long.
+function fitTurns(samples) {
+  // samples: [{ theta (deg), value, weight }]
+  const basis = (t) => {
+    const r = (t * Math.PI) / 180;
+    return [1, Math.cos(r), Math.sin(r), Math.cos(2 * r), Math.sin(2 * r)];
+  };
+  const n = 5;
+  const A = Array.from({ length: n }, () => Array(n).fill(0));
+  const y = Array(n).fill(0);
+  for (const { theta, value, weight } of samples) {
+    const f = basis(theta);
+    for (let i = 0; i < n; i++) {
+      y[i] += weight * f[i] * value;
+      for (let j = 0; j < n; j++) A[i][j] += weight * f[i] * f[j];
+    }
+  }
+  // Gaussian elimination.
+  for (let i = 0; i < n; i++) {
+    const p = A[i][i];
+    for (let j = i + 1; j < n; j++) {
+      const k = A[j][i] / p;
+      for (let c = i; c < n; c++) A[j][c] -= k * A[i][c];
+      y[j] -= k * y[i];
+    }
+  }
+  const coef = Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    let acc = y[i];
+    for (let c = i + 1; c < n; c++) acc -= A[i][c] * coef[c];
+    coef[i] = acc / A[i][i];
+  }
+  return (t) => basis(t).reduce((sum, f, i) => sum + f * coef[i], 0);
+}
+
+function smoothFlat(views) {
+  const centre = (v) => [v.box[0] + v.box[2] / 2, v.box[1] + v.box[3] / 2];
+  const longest = Math.max(...Object.values(views).map((v) => Math.hypot(v.tips[0] - v.wrist[0], v.tips[1] - v.wrist[1])));
+  for (const tilt of [-30, 0, 30]) {
+    const row = Object.entries(views)
+      .map(([k, v]) => [Number(k.split(",")[0]), Number(k.split(",")[1]), v])
+      .filter(([, tl]) => tl === tilt);
+    const weight = (v) => Math.max(0.05, Math.hypot(v.tips[0] - v.wrist[0], v.tips[1] - v.wrist[1]) / longest) ** 2;
+    const fit = (pick) => fitTurns(row.map(([t, , v]) => ({ theta: t, value: pick(v), weight: weight(v) })));
+    const fx = fit((v) => v.wrist[0] - centre(v)[0]), fy = fit((v) => v.wrist[1] - centre(v)[1]);
+    const gx = fit((v) => v.tips[0] - centre(v)[0]), gy = fit((v) => v.tips[1] - centre(v)[1]);
+    for (const [t, , v] of row) {
+      const c = centre(v);
+      v.wrist = pt(c[0] + fx(t), c[1] + fy(t));
+      v.tips = pt(c[0] + gx(t), c[1] + gy(t));
+    }
+  }
+}
+smoothFlat(sets.flat);
+
 // Forearm views. The lying forearm was generated from a different starting
 // angle: measured on the sheets, the hand is most foreshortened (fingers to the
 // camera) at turn 60 and the forearm shows its cuff opening head-on at -75,
