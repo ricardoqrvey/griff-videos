@@ -199,7 +199,9 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false
     // the joint by LONG_FOLD_AT + 40. It leaves the corner along the forearm
     // (nearly parallel to it) and bends a little toward the elbow.
     const short = hw * (0.22 + 0.3 * clamp((LONG_FOLD_AT - 12) / 50));
-    const full = hw * 1.8;
+    // ...but never more than 3/4 of the way across to the arm's far edge.
+    const across = (a.sleeve.upper[0] + a.sleeve.upper[1]) / Math.max(0.2, Math.abs(f[0] * u[1] - f[1] * u[0]));
+    const full = Math.min(hw * 1.8, across * 0.75);
     const len = short + (Math.max(short, full) - short) * clamp((deg - LONG_FOLD_AT) / 40);
     const q: V = [V0[0] - f[0] * len * 0.5, V0[1] - f[1] * len * 0.5];
     const t = norm([-f[0] * 0.25 - c[0] * 0.75, -f[1] * 0.25 - c[1] * 0.75]);
