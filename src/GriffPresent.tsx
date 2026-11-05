@@ -1,7 +1,7 @@
 import { AbsoluteFill, Audio, Easing, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { shapeAt, WORDS } from "./performance";
 import { ArmPose, Rig, STAGE_W } from "./rig/Rig";
-import { ArmKey, armAt } from "./rig/timeline";
+import { ArmKey, armAt, rollAt } from "./rig/timeline";
 
 // Griff presenting, front view, waist up, 1:1. Every gesture answers a line:
 // open hand to introduce, shrug for "good luck", fingers to count the list,
@@ -110,6 +110,21 @@ const faceAt = (t: number): Required<Face> => {
   return Object.fromEntries(KEYS.map((n) => [n, (prev[n] ?? 0) + ((cur[n] ?? 0) - (prev[n] ?? 0)) * k])) as Required<Face>;
 };
 
+// The wrist rolls in 3D on the way between the resting hand (seen edge-on,
+// Turntable turn 90) and the open palm or a raised gesture (palm to the
+// camera, turn 180), and back. The count and "Done" just cut.
+const SIDE_ON = 90, PALM_ON = 180;
+const roll = (from?: string, to?: string): [number, number] | null => {
+  if (from === THUMB || to === THUMB) return null;
+  if (!from && to) return [SIDE_ON, PALM_ON];
+  if (from && !to) return [PALM_ON, SIDE_ON];
+  return null;
+};
+const withRoll = (p: ArmPose, frame: number, keys: ArmKey[], on: boolean): ArmPose => {
+  const hand3d = on ? rollAt(frame, keys, roll) : undefined;
+  return hand3d ? { ...p, hand3d } : p;
+};
+
 // A slow drift at shoulder and elbow so the arms never freeze (the wrist stays straight).
 const idle = (p: ArmPose, t: number, phase: number): ArmPose => ({
   ...p,
@@ -119,7 +134,7 @@ const idle = (p: ArmPose, t: number, phase: number): ArmPose => ({
 
 export const GRIFF_PRESENT_FRAMES = Math.ceil(36.48 * FPS);
 
-export const GriffPresent: React.FC = () => {
+export const GriffPresent: React.FC<{ wristRoll?: boolean }> = ({ wristRoll = false }) => {
   const frame = useCurrentFrame();
   const { fps, width } = useVideoConfig();
   const t = frame / fps;
@@ -127,7 +142,10 @@ export const GriffPresent: React.FC = () => {
 
   const pose = {
     view: "000" as const,
-    arms: { l: idle(armAt(frame, fps, LEFT), t, 0), r: idle(armAt(frame, fps, RIGHT), t, 2) },
+    arms: {
+      l: withRoll(idle(armAt(frame, fps, LEFT), t, 0), frame, LEFT, wristRoll),
+      r: withRoll(idle(armAt(frame, fps, RIGHT), t, 2), frame, RIGHT, wristRoll),
+    },
     head: { tilt: face.tilt + Math.sin(t * 0.8) * 0.6, nod: face.nod + Math.sin(t * 2.1) * 0.8 },
     face: {
       mouth: shapeAt(t),

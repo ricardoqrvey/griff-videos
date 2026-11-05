@@ -1,7 +1,7 @@
 // Keyframe helpers: poses ease from one key to the next (soft springs, Griff is relaxed), turns step through
 // the in-between views a few frames each.
 import { spring } from "remotion";
-import { ArmPose, turnPath, View } from "./Rig";
+import { ArmPose, Hand3dPose, turnPath, View } from "./Rig";
 
 export type ArmKey = { at: number; pose: ArmPose };
 export type TurnKey = { at: number; to: View; dir?: "cw" | "ccw" };
@@ -42,4 +42,30 @@ export function viewAt(frame: number, start: View, turns: TurnKey[]): View {
     view = path[k];
   }
   return view;
+}
+
+/** Wrist roll between hand shapes: for the first `frames` of a move, the
+ *  Turntable hand and forearm stand in for the flat ones, rolling from one
+ *  turn to another (15° views, eased). `roll` gives the turns for a change of
+ *  hand (from, to), or null to cut straight to the new hand. */
+export function rollAt(
+  frame: number,
+  keys: ArmKey[],
+  roll: (from: string | undefined, to: string | undefined) => [number, number] | null,
+  frames = 9,
+): Hand3dPose | undefined {
+  let prev: string | undefined;
+  let out: Hand3dPose | undefined;
+  for (const k of keys) {
+    if (frame < k.at) break;
+    const turns = k.pose.hand !== prev ? roll(prev, k.pose.hand) : null;
+    out = undefined;
+    if (turns && frame < k.at + frames) {
+      const x = (frame - k.at) / (frames - 1);
+      const e = x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2;
+      out = { turn: Math.round((turns[0] + (turns[1] - turns[0]) * e) / 15) * 15 };
+    }
+    prev = k.pose.hand;
+  }
+  return out;
 }

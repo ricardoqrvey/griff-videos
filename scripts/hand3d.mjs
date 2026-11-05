@@ -2,7 +2,10 @@
 // data for the hand playground (playground/hand3d.html).
 //
 //   node scripts/hand3d.mjs assets/characters/griff/hand3d/hand3d_sheet.svg \
-//     assets/characters/griff/hand3d/forearm3d_sheet.svg src/data/griff.rig.json playground/hand3d.data.js
+//     assets/characters/griff/hand3d/forearm3d_sheet.svg src/data/griff.rig.json playground/hand3d.data.js \
+//     src/data/griff.hand3d.json
+//
+// The last (optional) file is the same data for the Remotion rig.
 //
 // Two sets: "hang" (hand hanging from the wrist, turning around the forearm)
 // and "flat" (the All Views Grid: hand lying sideways, so turning it points
@@ -14,7 +17,7 @@ import { dirname, join } from "node:path";
 import { parse } from "node-html-parser";
 import { bbox, endCentre, markup, pointsOf, pt, round, SHAPES } from "./svg-geometry.mjs";
 
-const [sheetFile, forearmFile, rigFile, outFile] = process.argv.slice(2);
+const [sheetFile, forearmFile, rigFile, outFile, rigOutFile] = process.argv.slice(2);
 const load = (file) => parse(readFileSync(file, "utf8").replace(/<metadata>[\s\S]*?<\/metadata>/g, ""));
 const root = load(sheetFile);
 const rig = JSON.parse(readFileSync(rigFile, "utf8"));
@@ -142,11 +145,13 @@ for (const set of ["hang", "flat"]) {
     // The cuff is the end of the forearm in the direction the hand points.
     const d = set === "hang" ? [0, 1] : [hand.tips[0] - hand.wrist[0], hand.tips[1] - hand.wrist[1]];
     const cuff = endCentre(f.P, c, [c[0] + d[0], c[1] + d[1]], 12, 22);
+    // The other end, where the rig's elbow pivot goes: about half a sleeve in.
+    const elbow = endCentre(f.P, c, [c[0] - d[0], c[1] - d[1]], 12, 30);
     // The cuff wraps the wrist, so the forearm draws on top, except while its
     // opening faces the camera (lying, forearm turns -135..-15, centred on -75)
     // and the hand comes out toward the viewer.
     const front = set === "hang" || !(ft > -135 && ft < -15);
-    forearm3d[set][key] = { markup: f.markup, cuff: pt(...cuff), front, turn: ft, centre: c, len: Math.max(f.b.maxX - f.b.minX, f.b.maxY - f.b.minY), dir: d };
+    forearm3d[set][key] = { markup: f.markup, cuff: pt(...cuff), elbow: pt(...elbow), front, turn: ft, centre: c, len: Math.max(f.b.maxX - f.b.minX, f.b.maxY - f.b.minY), dir: d };
   }
 }
 
@@ -198,6 +203,7 @@ const data = {
 };
 
 writeFileSync(outFile, `window.HAND3D = ${JSON.stringify(data)};\n`);
+if (rigOutFile) writeFileSync(rigOutFile, JSON.stringify(data));
 console.log(
   Object.fromEntries(Object.entries(sets).map(([k, v]) => [k, Object.keys(v).length])), "hand views,",
   Object.fromEntries(Object.entries(forearm3d).map(([k, v]) => [k, Object.keys(v).length])), "paired forearms",

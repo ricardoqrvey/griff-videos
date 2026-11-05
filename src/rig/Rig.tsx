@@ -2,6 +2,7 @@
 // Each view is a stack of pieces; arms bend at shoulder, elbow and wrist, and
 // hands can be swapped for any hand in the library.
 import rigData from "../data/griff.rig.json";
+import hand3dData from "../data/griff.hand3d.json";
 import { Face, FacePose } from "./Face";
 
 type Pt = [number, number];
@@ -46,6 +47,19 @@ type HandData = {
 
 const RIG = rigData as unknown as { views: Record<string, ViewData>; hands: Record<string, HandData> };
 
+// Turntable views of the hand with its forearm (scripts/hand3d.mjs), placed by
+// hand in the playground. Joint (wrist/cuff) at the origin, in hand-art units.
+type Hand3dView = { markup: string; wrist: Pt };
+type Forearm3dView = { markup: string; cuff: Pt; elbow: Pt; front: boolean; mouth?: { x: number; y: number; rx: number; ry: number; rot: number } };
+type Offset = { hand?: Pt; arm?: Pt; mouth?: Forearm3dView["mouth"] | false };
+const H3 = hand3dData as unknown as {
+  sets: Record<string, Record<string, Hand3dView>>;
+  forearm3d: Record<string, Record<string, Forearm3dView>>;
+  forearm3dScale: Record<string, number>;
+  offsets: Record<string, Offset>;
+  handScale: number;
+};
+
 // Views on the left half of the turn are the right half, mirrored.
 export const VIEWS = ["000", "045", "090", "135", "180", "225", "270", "315"] as const;
 export type View = (typeof VIEWS)[number];
@@ -64,7 +78,10 @@ export const HANDS = Object.keys(RIG.hands);
 
 /** Angles in degrees. shoulder: raise (outward in front/back views, forward in profile).
  *  elbow: bend, positive swings the forearm up on the outside (hand beside the head). wrist: extra tilt of the hand. */
-export type ArmPose = { shoulder: number; elbow: number; wrist?: number; hand?: string; mirrorHand?: boolean };
+export type ArmPose = { shoulder: number; elbow: number; wrist?: number; hand?: string; mirrorHand?: boolean; hand3d?: Hand3dPose };
+/** A Turntable view of hand and forearm together, drawn instead of the flat
+ *  forearm and hand: turn rolls the hand around the forearm (15° steps). */
+export type Hand3dPose = { turn: number; tilt?: number; set?: "hang" | "flat" };
 export type RigPose = {
   view: View;
   headView?: View; // lets the head lead the body by a frame during turns
@@ -157,6 +174,43 @@ function elbowFolds(a: ArmData, bend: number) {
   return folds;
 }
 
+/** Hand and forearm from one Turntable camera, laid along the rig's forearm:
+ *  the cuff on the rig's wrist, the far end on its elbow (the forearm is
+ *  stretched along its length to fit), the hand at the rig's hand size. */
+function Hand3d({ a, p, flip, id }: { a: ArmData; p: Hand3dPose; flip: number; id: string }) {
+  const set = p.set ?? "hang";
+  const key = `${p.turn},${p.tilt ?? 0}`;
+  const v = H3.sets[set][key], f = H3.forearm3d[set][key];
+  if (!v || !f) return null;
+  const o = H3.offsets[`${set}|${key}`] ?? {};
+  const [hx, hy] = o.hand ?? [0, 0], [ax, ay] = o.arm ?? [0, 0];
+  const fs = H3.forearm3dScale[set];
+  // The forearm's far end relative to the joint, mirrored with the hand.
+  const E: V = [flip * (ax + fs * (f.elbow[0] - f.cuff[0])), ay + fs * (f.elbow[1] - f.cuff[1])];
+  const s = H3.handScale;
+  const R: V = [a.elbow[0] - a.wrist[0], a.elbow[1] - a.wrist[1]];
+  const deg = (v: V) => (Math.atan2(v[1], v[0]) * 180) / Math.PI;
+  const rot = deg(R) - deg(E);
+  const stretch = Math.hypot(...R) / (Math.hypot(...E) * s);
+  const armT = `translate(${ax} ${ay}) scale(${fs}) translate(${-f.cuff[0]} ${-f.cuff[1]})`;
+  const handM = `<g transform="translate(${hx} ${hy}) translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
+  const armM = `<g transform="${armT}">${f.markup}</g>`;
+  // Each layer is [markup, part of the forearm?]; only the forearm stretches,
+  // about the joint, so the hand keeps its size and place.
+  const m = o.mouth === false ? null : o.mouth ?? f.mouth ?? null;
+  let layers: [string, boolean][] = f.front ? [[handM, false], [armM, true]] : [[armM, true], [handM, false]];
+  if (m) {
+    // Sleeve, hand, then the sleeve again except inside the cuff opening.
+    const ex = f.cuff[0] + m.x, ey = f.cuff[1] + m.y;
+    const mask = `<mask id="${id}" maskUnits="userSpaceOnUse" x="-20000" y="-20000" width="40000" height="40000"><rect x="-20000" y="-20000" width="40000" height="40000" fill="#fff"/><ellipse cx="${ex}" cy="${ey}" rx="${m.rx}" ry="${m.ry}" transform="rotate(${m.rot} ${ex} ${ey})" fill="#000"/></mask>`;
+    layers = [[armM, true], [handM, false], [`<g transform="${armT}" mask="url(#${id})">${mask}${f.markup}</g>`, true]];
+  }
+  const html = layers
+    .map(([markup, arm]) => `<g transform="rotate(${deg(E)}) scale(${arm ? stretch : 1} 1) rotate(${-deg(E)}) scale(${flip * s} ${s})">${markup}</g>`)
+    .join("");
+  return <g transform={`translate(${a.wrist[0]} ${a.wrist[1]}) rotate(${rot})`} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig" }) => {
   const { src, mirror } = SOURCE[pose.view];
   const view = RIG.views[src];
@@ -191,6 +245,10 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     );
   };
 
+  // The Turntable hand is a right hand (thumb to the body when its back faces
+  // the camera); Griff's right hand is the screen-left arm.
+  const hand3dFlip = (side: string, p: ArmPose) => ((side === "r") !== !!p.mirrorHand ? -1 : 1);
+
   const head = pose.head ?? {};
   // Everything above the legs rides the body lift and lean.
   const body = pose.body ?? {};
@@ -224,7 +282,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
         }
         if (name.startsWith("arm-")) {
           const side = name.slice(4);
-          const { a, sh, el, bend } = armChain(side);
+          const { a, p, sh, el, bend } = armChain(side);
           const clip = `${id}-elbow-${side}`;
           const sleeve = `${id}-sleeve-${side}`;
           const folds = elbowFolds(a, bend);
@@ -232,7 +290,13 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
             <g key={name} transform={`${vt} ${bodyT}`}>
               <g transform={sh}>
                 <Svg markup={a.upper} />
-                <Svg markup={a.lower} transform={el} />
+                {p.hand3d ? (
+                  <g transform={el}>
+                    <Hand3d a={a} p={p.hand3d} flip={hand3dFlip(side, p)} id={`${id}-cuff-${side}`} />
+                  </g>
+                ) : (
+                  <Svg markup={a.lower} transform={el} />
+                )}
                 {/* Elbow patch: both sleeve fills, clipped to a circle at the joint,
                     paint over the outlines where the two pieces cross. */}
                 <clipPath id={clip}>
@@ -265,7 +329,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
           const { a, p, sh, el, wr } = armChain(side);
           return (
             <g key={name} transform={`${vt} ${bodyT} ${sh} ${el} ${wr}`}>
-              {p.hand ? libHand(side, a, p) : <Svg markup={view.pieces[name]} transform={a.handFix} />}
+              {p.hand3d ? null : p.hand ? libHand(side, a, p) : <Svg markup={view.pieces[name]} transform={a.handFix} />}
             </g>
           );
         }
