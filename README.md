@@ -55,6 +55,12 @@ hand and the open palm or a raised gesture (`GriffPresentFlat` just swaps hands)
 longer moves: rolls held in a gesture, palm to back, a raised hand that wobbles, and the lying forearm
 (`fit: "free"`, drawn over the torso with `front`) swinging round toward the camera.
 
+Arms in front/back views can swing the forearm in across the body (negative elbow): past `ACROSS_AT`
+the forearm, elbow and hand are drawn over the vest while the upper arm stays behind it. Pass
+`across: acrossAt(frame, elbowAt)` from the timeline so the switch fades over three frames.
+`ArmAcrossLab` tries hand on chest, a forearm resting across the belly, palm-up crossing, chest to open
+gesture, and one arm across while the other is raised; `ArmAcrossSheet` lays poses out side by side.
+
 ## Layout
 
 - `src/rig/Rig.tsx`: views, joints, elbow patch, hand swaps, turns.

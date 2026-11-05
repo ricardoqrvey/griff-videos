@@ -1,7 +1,7 @@
 // Keyframe helpers: poses ease from one key to the next (soft springs, Griff is relaxed), turns step through
 // the in-between views a few frames each.
 import { spring } from "remotion";
-import { ArmPose, Hand3dPose, turnPath, View } from "./Rig";
+import { ACROSS_AT, ArmPose, Hand3dPose, turnPath, View } from "./Rig";
 
 export type ArmKey = { at: number; pose: ArmPose };
 export type TurnKey = { at: number; to: View; dir?: "cw" | "ccw" };
@@ -97,4 +97,13 @@ export function hand3dAt(frame: number, keys: Hand3dKey[]): Hand3dPose | undefin
     prev = k.to ? { ...k.to, turn: wrapTurn(k.to.turn) } : undefined;
   }
   return out;
+}
+
+/** How far in front of the torso a forearm is (ArmPose.across): the share of
+ *  the last `frames` frames its elbow was swung in past ACROSS_AT, so the
+ *  switch fades over a fixed few frames however slowly the arm moves. */
+export function acrossAt(frame: number, elbowAt: (frame: number) => number, frames = 3): number {
+  let n = 0;
+  for (let k = 0; k < frames; k++) if (elbowAt(Math.max(0, frame - k)) < -ACROSS_AT) n++;
+  return n / frames;
 }

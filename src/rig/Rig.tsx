@@ -79,7 +79,19 @@ export const HANDS = Object.keys(RIG.hands);
 
 /** Angles in degrees. shoulder: raise (outward in front/back views, forward in profile).
  *  elbow: bend, positive swings the forearm up on the outside (hand beside the head). wrist: extra tilt of the hand. */
-export type ArmPose = { shoulder: number; elbow: number; wrist?: number; hand?: string; mirrorHand?: boolean; hand3d?: Hand3dPose };
+export type ArmPose = {
+  shoulder: number;
+  elbow: number;
+  wrist?: number;
+  hand?: string;
+  mirrorHand?: boolean;
+  hand3d?: Hand3dPose;
+  /** Forearm and hand in front of the torso (0–1; between, the front copy fades
+   *  in over the back one). Defaults to on once the elbow swings the forearm in
+   *  across the body (elbow < -ACROSS_AT) in front/back views; acrossAt() in
+   *  the timeline eases that switch over a few frames. */
+  across?: number;
+};
 /** A Turntable view of hand and forearm together, drawn instead of the flat
  *  forearm and hand: turn rolls the hand around the forearm (15° steps). */
 export type Hand3dPose = {
@@ -191,6 +203,10 @@ const TURN_HAND_TUCK = 30;
 // The Turntable cuff ends lower than the rig's sleeve (measured on the front
 // view: 20 stage units), so the whole Turntable arm sits that much up the forearm.
 const HAND3D_LIFT = 20;
+// Elbow bend (degrees, inward) past which the forearm comes over the torso.
+// At rest the vest covers the sleeve's inner edge, so the switch shows a little:
+// acrossAt() in the timeline fades it over a few frames.
+export const ACROSS_AT = 5;
 
 /** Hand and forearm from one Turntable camera, laid along the rig's forearm:
  *  the cuff on the rig's wrist, the far end on its elbow (the forearm is
@@ -301,7 +317,75 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const sh = `rotate(${p.shoulder * s.sh} ${a.shoulder[0]} ${a.shoulder[1]})`;
     const el = `rotate(${p.elbow * s.el} ${a.elbow[0]} ${a.elbow[1]})`;
     const wr = `rotate(${(p.wrist ?? 0) * s.el} ${a.wrist[0]} ${a.wrist[1]})`;
-    return { a, p, sh, el, wr, bend: p.elbow * s.el };
+    const across = a.swingIn ? 0 : p.across ?? (p.elbow < -ACROSS_AT ? 1 : 0);
+    return { a, p, sh, el, wr, bend: p.elbow * s.el, across, shAngle: p.shoulder * s.sh };
+  };
+
+  /** Forearm (rig or Turntable), elbow patch and folds, in the shoulder's frame.
+   *  `hide` names a mask that keeps the upper arm's patch off the torso, for a
+   *  forearm drawn over it. */
+  const forearm = (side: string, hide?: string) => {
+    const { a, p, el, bend, shAngle } = armChain(side);
+    const black = view.pieces.torso.replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="#000"');
+    const unSh = `rotate(${-shAngle} ${a.shoulder[0]} ${a.shoulder[1]})`;
+    const clip = `${id}-elbow-${side}`;
+    const sleeve = `${id}-sleeve-${side}`;
+    // A free Turntable forearm carries its own bend and patches its own joint.
+    const free = p.hand3d?.fit === "free";
+    const folds = free ? [] : elbowFolds(a, bend);
+    return (
+      <>
+        {p.hand3d?.front ? null : p.hand3d ? (
+          <g transform={free ? undefined : el}>
+            <Hand3d a={a} p={p.hand3d} flip={hand3dFlip(side, p)} id={`${id}-cuff-${side}`} />
+          </g>
+        ) : (
+          <Svg markup={a.lower} transform={el} />
+        )}
+        {/* Elbow patch: both sleeve fills, clipped to a circle at the joint,
+            paint over the outlines where the two pieces cross. */}
+        <clipPath id={clip}>
+          <circle cx={a.elbow[0]} cy={a.elbow[1]} r={a.patch} />
+        </clipPath>
+        {hide && (
+          <mask id={hide} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
+            <rect x={-2000} y={-2000} width={6000} height={6000} fill="#fff" />
+            <g transform={unSh} dangerouslySetInnerHTML={{ __html: black }} />
+          </mask>
+        )}
+        {!free && (
+          <g clipPath={`url(#${clip})`}>
+            <g mask={hide ? `url(#${hide})` : undefined}>
+              <Svg markup={a.upperFill} />
+            </g>
+            <Svg markup={a.lowerFill} transform={el} />
+          </g>
+        )}
+        {folds.length > 0 && (
+          <>
+            {/* A mask, not a clipPath: the fills come wrapped in groups. */}
+            <mask id={sleeve} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
+              <g dangerouslySetInnerHTML={{ __html: white(a.upperFill) }} />
+              <g transform={el} dangerouslySetInnerHTML={{ __html: white(a.lowerFill) }} />
+            </mask>
+            <g mask={`url(#${sleeve})`} fill="none" stroke="#111" strokeWidth={5} strokeLinecap="round">
+              {folds.map((d) => (
+                <path key={d} d={d} />
+              ))}
+            </g>
+          </>
+        )}
+      </>
+    );
+  };
+
+  const hand = (side: string) => {
+    const { a, p, sh, el, wr } = armChain(side);
+    return (
+      <g transform={`${sh} ${el} ${wr}`}>
+        {p.hand3d ? null : p.hand ? libHand(side, a, p) : <Svg markup={view.pieces[`hand-${side}`]} transform={a.handFix} />}
+      </g>
+    );
   };
 
   const libHand = (side: string, a: ArmData, p: ArmPose) => {
@@ -340,6 +424,8 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
       {view.order
         .filter((name) => !name.startsWith("hand-"))
         .flatMap((name) => (name.startsWith("arm-") ? [`hand-${name.slice(4)}`, name] : [name]))
+        // Forearms swung in across the body come over the torso.
+        .flatMap((name) => (name === "torso" ? [name, ...Object.keys(view.arms).map((side) => `across-${side}`)] : [name]))
         .map((name) => {
         if (name === "head") {
           const hn = headSrc.neck;
@@ -361,70 +447,42 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
             </g>
           );
         }
+        if (name.startsWith("across-")) {
+          // Forearm, hand and elbow over the torso; the upper arm stays behind it.
+          const side = name.slice(7);
+          const { sh, across } = armChain(side);
+          if (!across) return null;
+          const hide = `${id}-torso-${side}`;
+          return (
+            <g key={name} transform={`${vt} ${bodyT}`} opacity={across < 1 ? across : undefined}>
+              {/* The hand first, so the cuff covers its wrist, as at rest. */}
+              {hand(side)}
+              <g transform={sh}>{forearm(side, hide)}</g>
+            </g>
+          );
+        }
         if (name.startsWith("arm-")) {
           const side = name.slice(4);
-          const { a, p, sh, el, bend } = armChain(side);
-          const clip = `${id}-elbow-${side}`;
-          const sleeve = `${id}-sleeve-${side}`;
-          // A free Turntable forearm carries its own bend.
-          const folds = p.hand3d?.fit === "free" ? [] : elbowFolds(a, bend);
+          const { sh, a, across } = armChain(side);
           return (
             <g key={name} transform={`${vt} ${bodyT}`}>
               <g transform={sh}>
                 <Svg markup={a.upper} />
-                {p.hand3d?.front ? null : p.hand3d ? (
-                  <g transform={p.hand3d.fit === "free" ? undefined : el}>
-                    <Hand3d a={a} p={p.hand3d} flip={hand3dFlip(side, p)} id={`${id}-cuff-${side}`} />
-                  </g>
-                ) : (
-                  <Svg markup={a.lower} transform={el} />
-                )}
-                {/* Elbow patch: both sleeve fills, clipped to a circle at the joint,
-                    paint over the outlines where the two pieces cross. */}
-                <clipPath id={clip}>
-                  <circle cx={a.elbow[0]} cy={a.elbow[1]} r={a.patch} />
-                </clipPath>
-                {/* A free Turntable forearm patches its own joint. */}
-                {p.hand3d?.fit !== "free" && (
-                  <g clipPath={`url(#${clip})`}>
-                    <Svg markup={a.upperFill} />
-                    <Svg markup={a.lowerFill} transform={el} />
-                  </g>
-                )}
-                {folds.length > 0 && (
-                  <>
-                    {/* A mask, not a clipPath: the fills come wrapped in groups. */}
-                    <mask id={sleeve} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
-                      <g dangerouslySetInnerHTML={{ __html: white(a.upperFill) }} />
-                      <g transform={el} dangerouslySetInnerHTML={{ __html: white(a.lowerFill) }} />
-                    </mask>
-                    <g mask={`url(#${sleeve})`} fill="none" stroke="#111" strokeWidth={5} strokeLinecap="round">
-                      {folds.map((d) => (
-                        <path key={d} d={d} />
-                      ))}
-                    </g>
-                  </>
-                )}
+                {across < 1 && forearm(side)}
               </g>
             </g>
           );
         }
         if (name.startsWith("hand-")) {
           const side = name.slice(5);
-          const { a, p, sh, el, wr } = armChain(side);
-          return (
-            <g key={name} transform={`${vt} ${bodyT} ${sh} ${el} ${wr}`}>
-              {p.hand3d ? null : p.hand ? libHand(side, a, p) : <Svg markup={view.pieces[name]} transform={a.handFix} />}
-            </g>
-          );
+          return armChain(side).across === 1 ? null : <g key={name} transform={`${vt} ${bodyT}`}>{hand(side)}</g>;
         }
         return <Svg key={name} markup={view.pieces[name]} transform={name === "legs" ? vt : `${vt} ${bodyT}`} />;
       })}
       {Object.keys(view.arms).map((side) => {
-        const { a, p, sh, el } = armChain(side);
+        const { a, p, sh, el, shAngle } = armChain(side);
         if (!p.hand3d?.front) return null;
         // The torso in the arm's frame (undoing the shoulder turn), in black for a mask.
-        const shAngle = Number(sh.match(/rotate\((-?[\d.e-]+)/)?.[1] ?? 0);
         const torso = `<g transform="rotate(${-shAngle} ${a.shoulder[0]} ${a.shoulder[1]})">${view.pieces.torso.replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="#000"')}</g>`;
         return (
           <g key={`front-${side}`} transform={`${vt} ${bodyT} ${sh} ${p.hand3d.fit === "free" ? "" : el}`}>

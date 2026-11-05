@@ -8,6 +8,8 @@ import { GRIFF_PRESENT_FRAMES, GriffPresent } from "./GriffPresent";
 import { HAND_SHEET_SIZE, HandSheet } from "./HandSheet";
 import { HAND3D_SHEET_SIZE, Hand3dSheet } from "./Hand3dSheet";
 import { HAND3D_LAB_FRAMES, Hand3dLab } from "./Hand3dLab";
+import { ARM_ACROSS_SHEET_SIZE, ArmAcrossSheet } from "./ArmAcrossSheet";
+import { ARM_ACROSS_LAB_FRAMES, ArmAcrossLab } from "./ArmAcrossLab";
 
 const FPS = 30;
 const DURATION = Math.ceil(36.48 * FPS);
@@ -26,5 +28,7 @@ export const Root: React.FC = () => (
     <Composition id="HandSheet" component={HandSheet} fps={FPS} durationInFrames={1} {...HAND_SHEET_SIZE} />
     <Composition id="Hand3dLab" component={Hand3dLab} fps={FPS} durationInFrames={HAND3D_LAB_FRAMES} width={1080} height={1080} />
     <Composition id="Hand3dSheet" component={Hand3dSheet} fps={FPS} durationInFrames={1} {...HAND3D_SHEET_SIZE} />
+    <Composition id="ArmAcrossLab" component={ArmAcrossLab} fps={FPS} durationInFrames={ARM_ACROSS_LAB_FRAMES} width={1080} height={1080} />
+    <Composition id="ArmAcrossSheet" component={ArmAcrossSheet} fps={FPS} durationInFrames={1} {...ARM_ACROSS_SHEET_SIZE} />
   </>
 );
