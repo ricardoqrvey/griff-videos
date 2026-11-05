@@ -160,6 +160,30 @@ const turnV = (v: V, deg: number): V => {
 /** Fold lines on the inside of a bent elbow. The first starts right in the
  *  "V" where the inner edges of upper arm and forearm meet (from ~12° of bend);
  *  the second, past ~50°, floats a little further along the forearm. */
+/** With the forearm folded up over the upper arm: the forearm's inside edge
+ *  carried on past the bend, over the upper arm, round into its rounded end,
+ *  so its shape reads where the two overlap. Opacity eases in from 60° to 90°. */
+function overlapLine(a: ArmData, bend: number): { d: string; opacity: number } | null {
+  const deg = Math.abs(bend);
+  if (deg < 60) return null;
+  const E = a.elbow;
+  const u = norm([E[0] - a.shoulder[0], E[1] - a.shoulder[1]]);
+  const f = turnV(norm([a.wrist[0] - E[0], a.wrist[1] - E[1]]), bend);
+  const c = norm([f[0] - u[0], f[1] - u[1]]);
+  let n: V = [-f[1], f[0]];
+  const plus = n[0] * c[0] + n[1] * c[1] > 0;
+  if (!plus) n = [-n[0], -n[1]];
+  const w = (plus ? a.sleeve.lower[0] : a.sleeve.lower[1]) - 2; // the outline's middle
+  // Start a little up the forearm from the inside corner, run down to the joint, round the end.
+  const back: V = [-f[0], -f[1]];
+  const start: V = [E[0] + n[0] * w + f[0] * w * 0.9, E[1] + n[1] * w + f[1] * w * 0.9];
+  const P: V = [E[0] + n[0] * w, E[1] + n[1] * w];
+  const th = (40 * Math.PI) / 180;
+  const Q: V = [E[0] + (n[0] * Math.cos(th) + back[0] * Math.sin(th)) * w, E[1] + (n[1] * Math.cos(th) + back[1] * Math.sin(th)) * w];
+  const sweep = n[0] * back[1] - n[1] * back[0] > 0 ? 1 : 0;
+  return { d: `M${start} L${P} A${w} ${w} 0 0 ${sweep} ${Q}`, opacity: Math.min(1, (deg - 60) / 30) };
+}
+
 function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend)) {
   const E = a.elbow;
   const u = norm([E[0] - a.shoulder[0], E[1] - a.shoulder[1]]);
@@ -205,12 +229,15 @@ const TURN_HAND_TUCK = 30;
 // The Turntable cuff ends lower than the rig's sleeve (measured on the front
 // view: 20 stage units), so the whole Turntable arm sits that much up the forearm.
 const HAND3D_LIFT = 20;
-// The elbow joint: the rig's sleeve pieces end in round caps of radius CAP_R,
+// The elbow joint: the rig's sleeve pieces end in round caps,
 // the upper arm's UPPER_CAP above the rig's elbow point and the forearm's
-// LOWER_CAP below it, half-widths UPPER_W and LOWER_W (measured, the same in every view). The joint sits
+// LOWER_CAP below it, with the fill half-widths below (measured, the same in
+// every view). The joint sits
 // ELBOW_PIVOT further down the arm, where the elbow reads right.
-const UPPER_CAP = 11, LOWER_CAP = 13, UPPER_W = 66, LOWER_W = 67.6, CAP_R = LOWER_W;
+const UPPER_CAP = 11, LOWER_CAP = 13;
+const UPPER_FILL: [number, number] = [63.5, 67.9], LOWER_FILL: [number, number] = [66.6, 69.3];
 const ELBOW_PIVOT = 70;
+const ARM_CLOSE = 8;
 // Elbow bend (degrees, inward) past which the forearm comes over the torso.
 // The elbow's round end stays behind the vest, so only the forearm's inner
 // edge over the vest changes at the switch.
@@ -322,8 +349,12 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const a = view.arms[side];
     const p = pose.arms[screenSide(side, mirror) as "l" | "r" | "near"] ?? REST;
     const s = a.swingIn ? { ...SIGN[side], el: -SIGN[side].el } : SIGN[side];
-    const sh = `rotate(${p.shoulder * s.sh} ${a.shoulder[0]} ${a.shoulder[1]})`;
-    const bend = p.elbow * s.el, shAngle = p.shoulder * s.sh;
+    const bend = p.elbow * s.el;
+    // As the forearm rises (bent outward past horizontal) the upper arm closes
+    // in against the body, up to ARM_CLOSE degrees with the forearm straight up.
+    const rise = a.swingIn || p.elbow <= 0 ? 0 : Math.max(0, -turnV(norm([a.wrist[0] - a.elbow[0], a.wrist[1] - a.elbow[1]]), p.shoulder * s.sh + bend)[1]);
+    const shAngle = (p.shoulder - ARM_CLOSE * rise) * s.sh;
+    const sh = `rotate(${shAngle} ${a.shoulder[0]} ${a.shoulder[1]})`;
     // One fixed joint for every angle: ELBOW_PIVOT below the forearm's own
     // rounded end. The upper arm stretches so its rounded end sits on the
     // joint (that end moves rigidly, only the sleeve above it stretches); the
@@ -333,25 +364,38 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const D = jointed ? p.drop ?? ELBOW_PIVOT : 0;
     const ua = norm([a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]]);
     const fa = norm([a.wrist[0] - a.elbow[0], a.wrist[1] - a.elbow[1]]);
-    // The joint sits on the forearm's own axis, so the sleeve stays straight at rest.
-    const J: V = jointed ? [a.elbow[0] + fa[0] * (LOWER_CAP + D), a.elbow[1] + fa[1] * (LOWER_CAP + D)] : a.elbow;
-    const Cu: V = [a.elbow[0] - ua[0] * UPPER_CAP, a.elbow[1] - ua[1] * UPPER_CAP];
-    // Upper arm: a shear-stretch about the shoulder that carries its rounded
-    // end's centre Cu onto J, and every point on the line across Cu with it.
-    const L = Math.hypot(Cu[0] - a.shoulder[0], Cu[1] - a.shoulder[1]);
+    // Measured where the pieces meet (upper: at its round end; forearm: at the
+    // joint), narrow side first; a.sleeve says which side of the axis is narrow.
+    const half = (w: [number, number], narrowFirst: boolean) => ({ w: (w[0] + w[1]) / 2, o: ((narrowFirst ? 1 : -1) * (w[0] - w[1])) / 2 });
+    const U = half(UPPER_FILL, a.sleeve.upper[0] < a.sleeve.upper[1]), F = half(LOWER_FILL, a.sleeve.lower[0] < a.sleeve.lower[1]);
+    const nU: V = [-ua[1], ua[0]], nF: V = [-fa[1], fa[0]];
+    // The joint: on the forearm's centre line, D below its own round end.
+    const J: V = jointed
+      ? [a.elbow[0] + fa[0] * (LOWER_CAP + D) + nF[0] * F.o, a.elbow[1] + fa[1] * (LOWER_CAP + D) + nF[1] * F.o]
+      : a.elbow;
+    const Cu: V = [a.elbow[0] - ua[0] * UPPER_CAP + nU[0] * U.o, a.elbow[1] - ua[1] * UPPER_CAP + nU[1] * U.o];
+    // Upper arm, as affine maps [a b c d e f]: widened about its centre line to
+    // the forearm's width; then a shear-stretch about the shoulder carrying its
+    // round end's centre Cu (and the line across it) onto J. Its round end
+    // past that line moves rigidly; the part above the shoulder is only widened.
+    type Aff = number[];
+    const comp = (X: Aff, Y: Aff): Aff => [
+      X[0] * Y[0] + X[2] * Y[1], X[1] * Y[0] + X[3] * Y[1], X[0] * Y[2] + X[2] * Y[3], X[1] * Y[2] + X[3] * Y[3],
+      X[0] * Y[4] + X[2] * Y[5] + X[4], X[1] * Y[4] + X[3] * Y[5] + X[5],
+    ];
+    const lin = (A: number[], P: V): Aff => [A[0], A[1], A[2], A[3], P[0] - A[0] * P[0] - A[2] * P[1], P[1] - A[1] * P[0] - A[3] * P[1]];
+    const str = (X: Aff) => `matrix(${X.join(" ")})`;
+    const L = Math.hypot(a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]) - UPPER_CAP;
     const dl: V = [J[0] - Cu[0], J[1] - Cu[1]];
-    // Widened a touch to the forearm's width, so the two outlines run on.
-    const nx = -ua[1], ny = ua[0], wk = LOWER_W / UPPER_W - 1;
-    const W = [1 + wk * nx * nx, wk * nx * ny, wk * nx * ny, 1 + wk * ny * ny]; // [a, b, c, d]
-    const M = [1 + (dl[0] * ua[0]) / L, (dl[1] * ua[0]) / L, (dl[0] * ua[1]) / L, 1 + (dl[1] * ua[1]) / L];
-    const mul = (A: number[], B: number[]) => [A[0] * B[0] + A[2] * B[1], A[1] * B[0] + A[3] * B[1], A[0] * B[2] + A[2] * B[3], A[1] * B[2] + A[3] * B[3]];
-    // A linear map about the shoulder, then a shift.
-    const about = (A: number[], t: V = [0, 0]) => {
-      const S0 = a.shoulder;
-      return `matrix(${A[0]} ${A[1]} ${A[2]} ${A[3]} ${S0[0] - A[0] * S0[0] - A[2] * S0[1] + t[0]} ${S0[1] - A[1] * S0[0] - A[3] * S0[1] + t[1]})`;
-    };
-    const up = jointed ? about(mul(M, W)) : undefined;
-    const tip = about(W, dl);
+    const wk = F.w / U.w - 1;
+    const Wf = lin([1 + wk * nU[0] * nU[0], wk * nU[0] * nU[1], wk * nU[0] * nU[1], 1 + wk * nU[1] * nU[1]], [a.shoulder[0] + nU[0] * U.o, a.shoulder[1] + nU[1] * U.o]);
+    const Ms = lin([1 + (dl[0] * ua[0]) / L, (dl[1] * ua[0]) / L, (dl[0] * ua[1]) / L, 1 + (dl[1] * ua[1]) / L], a.shoulder);
+    const up = jointed ? str(comp(Ms, Wf)) : undefined;
+    // The round end scales evenly (a widened circle would turn into an ellipse).
+    const tip = str(comp([1, 0, 0, 1, dl[0], dl[1]], lin([1 + wk, 0, 0, 1 + wk], Cu)));
+    const top = str(Wf);
+    // A little inside the upper arm's round end, so its outline keeps its weight.
+    const capR = F.w - 3;
     const el = `rotate(${bend} ${J[0]} ${J[1]})`;
     const wr = `rotate(${(p.wrist ?? 0) * s.el} ${a.wrist[0]} ${a.wrist[1]})`;
     const across = a.swingIn ? 0 : p.across ?? (p.elbow < -ACROSS_AT ? 1 : 0);
@@ -361,22 +405,30 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
       const n: V = [-ax[1] * 4000, ax[0] * 4000], f: V = [ax[0] * 4000 * dir, ax[1] * 4000 * dir];
       return `M${c[0] + n[0]} ${c[1] + n[1]}L${c[0] - n[0]} ${c[1] - n[1]}L${c[0] - n[0] + f[0]} ${c[1] - n[1] + f[1]}L${c[0] + n[0] + f[0]} ${c[1] + n[1] + f[1]}Z`;
     };
-    const at = (o: number): V => [Cu[0] + ua[0] * o, Cu[1] + ua[1] * o];
-    const cut = jointed ? { near: plane(at(0.75), ua, -1), far: plane(at(-0.75), ua, 1) } : undefined;
+    const at = (o: number): V => [a.elbow[0] + ua[0] * (o - UPPER_CAP), a.elbow[1] + ua[1] * (o - UPPER_CAP)];
+    // Three parts: above the shoulder pivot (only widened, so the shoulder
+    // stays under the vest), the stretched sleeve, and the rigid round end.
+    const band = (o0: number, o1: number) => {
+      const c0 = at(o0), c1 = at(o1), n: V = [-ua[1] * 4000, ua[0] * 4000];
+      return `M${c0[0] + n[0]} ${c0[1] + n[1]}L${c0[0] - n[0]} ${c0[1] - n[1]}L${c1[0] - n[0]} ${c1[1] - n[1]}L${c1[0] + n[0]} ${c1[1] + n[1]}Z`;
+    };
+    const cut = jointed ? { top: plane(at(-L + 0.75), ua, -1), near: band(-L - 0.75, 0.75), far: plane(at(-0.75), ua, 1) } : undefined;
     // The forearm past the joint, plus a round end on it (forearm's own frame).
-    const trim = jointed ? { plane: plane(J, fa, 1), J } : undefined;
-    return { a, p, sh, el, wr, bend, across, shAngle, up, tip, cut, moved, trim };
+    const trim = jointed ? { plane: plane(J, fa, 1), J, r: capR } : undefined;
+    return { a, p, sh, el, wr, bend, across, shAngle, up, tip, top, cut, moved, trim };
   };
 
   /** Upper-arm markup, stretched to the dropped elbow (see armChain). */
   const upperArm = (side: string, markup: string, key: string) => {
-    const { up, tip, cut } = armChain(side);
+    const { up, tip, top, cut } = armChain(side);
     if (!cut) return <Svg markup={markup} />;
     const n = `${id}-ua-${side}-${key}`;
     return (
       <>
+        <clipPath id={`${n}-t`}><path d={cut.top} /></clipPath>
         <clipPath id={`${n}-a`}><path d={cut.near} /></clipPath>
         <clipPath id={`${n}-b`}><path d={cut.far} /></clipPath>
+        <Svg markup={markup} transform={top} clipPath={`url(#${n}-t)`} />
         <Svg markup={markup} transform={up} clipPath={`url(#${n}-a)`} />
         <Svg markup={markup} transform={tip} clipPath={`url(#${n}-b)`} />
       </>
@@ -406,19 +458,20 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     // A free Turntable forearm carries its own bend and patches its own joint.
     const free = p.hand3d?.fit === "free";
     const folds = free ? [] : elbowFolds(moved, bend);
+    const line = free || p.elbow <= 0 ? null : overlapLine(moved, bend);
     return (
       <>
         {trim && (
           <>
             <clipPath id={trimId}>
               <path d={trim.plane} />
-              <circle cx={trim.J[0]} cy={trim.J[1]} r={CAP_R} />
+              <circle cx={trim.J[0]} cy={trim.J[1]} r={trim.r} />
             </clipPath>
             <clipPath id={`${trimId}-plane`}>
               <path d={trim.plane} />
             </clipPath>
             <clipPath id={`${trimId}-disc`}>
-              <circle cx={trim.J[0]} cy={trim.J[1]} r={CAP_R} />
+              <circle cx={trim.J[0]} cy={trim.J[1]} r={trim.r} />
             </clipPath>
           </>
         )}
@@ -467,6 +520,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
               {folds.map((d) => (
                 <path key={d} d={d} />
               ))}
+              {line && <path d={line.d} strokeWidth={4.5} opacity={line.opacity} />}
             </g>
           </>
         )}
