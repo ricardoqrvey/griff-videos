@@ -160,38 +160,10 @@ const turnV = (v: V, deg: number): V => {
 /** Fold lines on the inside of a bent elbow. The first starts right in the
  *  "V" where the inner edges of upper arm and forearm meet (from ~12° of bend);
  *  the second, past ~50°, floats a little further along the forearm. */
-/** With the forearm folded up over the upper arm: the forearm's inside edge
- *  carried on past the bend, over the upper arm, round into its rounded end,
- *  so its shape reads where the two overlap. Opacity eases in from 60° to 90°. */
-function overlapLine(a: ArmData, bend: number): { d: string; opacity: number } | null {
-  const deg = Math.abs(bend);
-  if (deg < 60) return null;
-  const E = a.elbow;
-  const u = norm([E[0] - a.shoulder[0], E[1] - a.shoulder[1]]);
-  const f = turnV(norm([a.wrist[0] - E[0], a.wrist[1] - E[1]]), bend);
-  const c = norm([f[0] - u[0], f[1] - u[1]]);
-  let n: V = [-f[1], f[0]];
-  const plus = n[0] * c[0] + n[1] * c[1] > 0;
-  if (!plus) n = [-n[0], -n[1]];
-  const w = (plus ? a.sleeve.lower[0] : a.sleeve.lower[1]) - 2; // the outline's middle
-  // From the inside corner (where the two sleeves' inside edges meet), down
-  // the forearm's edge to the joint, round its end.
-  const back: V = [-f[0], -f[1]];
-  const P: V = [E[0] + n[0] * w, E[1] + n[1] * w];
-  const un: V = [-u[1], u[0]];
-  const uIn = un[0] * c[0] + un[1] * c[1] > 0;
-  const wu = (uIn ? a.sleeve.upper[0] : a.sleeve.upper[1]) - 2;
-  const p1: V = [E[0] + (uIn ? un[0] : -un[0]) * wu, E[1] + (uIn ? un[1] : -un[1]) * wu];
-  const den = u[0] * f[1] - u[1] * f[0];
-  const along = Math.abs(den) < 1e-6 ? 0 : -((p1[0] - P[0]) * u[1] - (p1[1] - P[1]) * u[0]) / den;
-  const start: V = [P[0] + f[0] * Math.max(0, along), P[1] + f[1] * Math.max(0, along)];
-  const th = (40 * Math.PI) / 180;
-  const Q: V = [E[0] + (n[0] * Math.cos(th) + back[0] * Math.sin(th)) * w, E[1] + (n[1] * Math.cos(th) + back[1] * Math.sin(th)) * w];
-  const sweep = n[0] * back[1] - n[1] * back[0] > 0 ? 1 : 0;
-  return { d: `M${start} L${P} A${w} ${w} 0 0 ${sweep} ${Q}`, opacity: Math.min(1, (deg - 60) / 30) };
-}
-
-function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend)) {
+/** Creases on the inside of the elbow. With `long` (a forearm raised outward),
+ *  past LONG_FOLD_AT degrees the short creases give way to one long fold from
+ *  the inside corner into the elbow, growing with the bend. */
+function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false) {
   const E = a.elbow;
   const u = norm([E[0] - a.shoulder[0], E[1] - a.shoulder[1]]);
   const f = turnV(norm([a.wrist[0] - E[0], a.wrist[1] - E[1]]), bend);
@@ -221,7 +193,20 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend)) {
     return `M${start} Q${q} ${end}`;
   };
   const tuck = 2; // just inside the outline
-  const folds = [crease([V[0] - c[0] * tuck, V[1] - c[1] * tuck], clamp((deg - 12) / 50))];
+  const V0: V = [V[0] - c[0] * tuck, V[1] - c[1] * tuck];
+  if (long && deg >= LONG_FOLD_AT) {
+    // Starts as long as the first crease was, reaches most of the way to the
+    // joint by LONG_FOLD_AT + 40, bowing toward the forearm's side.
+    const short = hw * (0.22 + 0.3 * clamp((LONG_FOLD_AT - 12) / 50));
+    const full = 0.85 * Math.hypot(V0[0] - E[0], V0[1] - E[1]);
+    const len = short + (Math.max(short, full) - short) * clamp((deg - LONG_FOLD_AT) / 40);
+    const end: V = [V0[0] - c[0] * len, V0[1] - c[1] * len];
+    const fc = -(f[0] * c[0] + f[1] * c[1]);
+    const side = norm([-f[0] - fc * c[0], -f[1] - fc * c[1]]);
+    const q: V = [(V0[0] + end[0]) / 2 + side[0] * len * 0.18, (V0[1] + end[1]) / 2 + side[1] * len * 0.18];
+    return [`M${V0} Q${q} ${end}`];
+  }
+  const folds = [crease(V0, clamp((deg - 12) / 50))];
   if (deg > 50) {
     const s2: V = [V[0] - c[0] * hw * 0.08 + f[0] * hw * 0.2, V[1] - c[1] * hw * 0.08 + f[1] * hw * 0.2];
     folds.push(crease(s2, clamp((deg - 50) / 50) * 0.7));
@@ -248,6 +233,7 @@ const UPPER_CAP = 11, LOWER_CAP = 13;
 const UPPER_FILL: [number, number] = [63.5, 67.9], LOWER_FILL: [number, number] = [66.6, 69.3];
 const ELBOW_PIVOT = 70;
 const ARM_CLOSE = 8;
+const LONG_FOLD_AT = 70;
 // Elbow bend (degrees, inward) past which the forearm comes over the torso.
 // The elbow's round end stays behind the vest, so only the forearm's inner
 // edge over the vest changes at the switch.
@@ -467,8 +453,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const sleeve = `${id}-sleeve-${side}`;
     // A free Turntable forearm carries its own bend and patches its own joint.
     const free = p.hand3d?.fit === "free";
-        const folds = free ? [] : elbowFolds(moved, bend);
-    const line = free || p.elbow <= 0 ? null : overlapLine(moved, bend);
+        const folds = free ? [] : elbowFolds(moved, bend, Math.abs(bend), p.elbow > 0);
     return (
       <>
         {trim && (
@@ -527,9 +512,9 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
               <g transform={el} clipPath={trimmed} dangerouslySetInnerHTML={{ __html: white(a.lowerFill) }} />
             </mask>
             <g mask={`url(#${sleeve})`} fill="none" stroke="#111" strokeWidth={5} strokeLinecap="round">
-              {/* The short creases give way to the long line. */}
-              {(line?.opacity ?? 0) < 1 && folds.map((d) => <path key={d} d={d} opacity={1 - (line?.opacity ?? 0)} />)}
-              {line && <path d={line.d} strokeWidth={4.5} opacity={line.opacity} />}
+              {folds.map((d) => (
+                <path key={d} d={d} />
+              ))}
             </g>
           </>
         )}
