@@ -195,15 +195,15 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false
   const tuck = 2; // just inside the outline
   const V0: V = [V[0] - c[0] * tuck, V[1] - c[1] * tuck];
   if (long && deg >= LONG_FOLD_AT) {
-    // Starts as long as the first crease was, reaches most of the way to the
-    // joint by LONG_FOLD_AT + 40, bowing toward the forearm's side.
+    // Starts as long as the first crease was and grows to most of the way to
+    // the joint by LONG_FOLD_AT + 40. It leaves the corner along the forearm
+    // (nearly parallel to it) and bends a little toward the elbow.
     const short = hw * (0.22 + 0.3 * clamp((LONG_FOLD_AT - 12) / 50));
-    const full = 0.85 * Math.hypot(V0[0] - E[0], V0[1] - E[1]);
+    const full = hw * 1.8;
     const len = short + (Math.max(short, full) - short) * clamp((deg - LONG_FOLD_AT) / 40);
-    const end: V = [V0[0] - c[0] * len, V0[1] - c[1] * len];
-    const fc = -(f[0] * c[0] + f[1] * c[1]);
-    const side = norm([-f[0] - fc * c[0], -f[1] - fc * c[1]]);
-    const q: V = [(V0[0] + end[0]) / 2 + side[0] * len * 0.18, (V0[1] + end[1]) / 2 + side[1] * len * 0.18];
+    const q: V = [V0[0] - f[0] * len * 0.5, V0[1] - f[1] * len * 0.5];
+    const t = norm([-f[0] * 0.25 - c[0] * 0.75, -f[1] * 0.25 - c[1] * 0.75]);
+    const end: V = [q[0] + t[0] * len * 0.5, q[1] + t[1] * len * 0.5];
     return [`M${V0} Q${q} ${end}`];
   }
   const folds = [crease(V0, clamp((deg - 12) / 50))];
