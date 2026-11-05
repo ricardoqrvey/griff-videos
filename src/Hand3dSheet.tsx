@@ -4,16 +4,16 @@ import { ArmPose, Rig, STAGE_W } from "./rig/Rig";
 // Contact sheet: the rig's own and library hands next to the Turntable hand at
 // each roll, on one arm of the front view, to pick which views match which hands.
 const SIDE: "l" | "r" = "r";
-const CELL = { w: 300, h: 300, scale: 0.75, top: 900, left: SIDE === "r" ? 640 : -40 };
-const TURNS = [-105, -15];
+const CELL = { w: 300, h: 300, scale: 0.5, top: 620, left: SIDE === "r" ? 560 : -160 };
+const TURNS = Array.from({ length: 24 }, (_, i) => -180 + i * 15);
 
 type Cell = { label: string; arm: ArmPose };
 const cells: Cell[] = [
   { label: "propia", arm: { shoulder: 0, elbow: 0 } },
   { label: "turn-03", arm: { shoulder: 0, elbow: 0, hand: "turn-03" } },
-  ...TURNS.map((turn) => ({ label: `3D ${turn}`, arm: { shoulder: 0, elbow: 0, hand3d: { turn } } })),
+  ...TURNS.map((turn) => ({ label: `flat 30 ${turn}`, arm: { shoulder: 0, elbow: 0, hand3d: { turn, tilt: 30, set: "flat" as const, fit: "free" as const } } })),
 ];
-const COLS = 4;
+const COLS = 7;
 export const HAND3D_SHEET_SIZE = { width: CELL.w * COLS, height: CELL.h * Math.ceil(cells.length / COLS) };
 
 export const Hand3dSheet: React.FC = () => (

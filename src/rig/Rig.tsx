@@ -81,7 +81,17 @@ export const HANDS = Object.keys(RIG.hands);
 export type ArmPose = { shoulder: number; elbow: number; wrist?: number; hand?: string; mirrorHand?: boolean; hand3d?: Hand3dPose };
 /** A Turntable view of hand and forearm together, drawn instead of the flat
  *  forearm and hand: turn rolls the hand around the forearm (15° steps). */
-export type Hand3dPose = { turn: number; tilt?: number; set?: "hang" | "flat" };
+export type Hand3dPose = {
+  turn: number;
+  tilt?: number;
+  set?: "hang" | "flat";
+  /** "rig" (default): laid along the rig's forearm, stretched to its length.
+   *  "free": the view as drawn, its far end on the rig's elbow (the elbow angle
+   *  is ignored); for the lying set, where the forearm swings toward the camera. */
+  fit?: "rig" | "free";
+  /** Draw the forearm and hand over the torso (reaching toward the camera). */
+  front?: boolean;
+};
 export type RigPose = {
   view: View;
   headView?: View; // lets the head lead the body by a frame during turns
@@ -221,6 +231,10 @@ function Hand3d({ a, p, flip, id }: { a: ArmData; p: Hand3dPose; flip: number; i
     const mask = `<mask id="${id}" maskUnits="userSpaceOnUse" x="-20000" y="-20000" width="40000" height="40000"><rect x="-20000" y="-20000" width="40000" height="40000" fill="#fff"/><ellipse cx="${ex}" cy="${ey}" rx="${m.rx}" ry="${m.ry}" transform="rotate(${m.rot} ${ex} ${ey})" fill="#000"/></mask>`;
     layers = [[armM, true], [handM, false], [`<g transform="${armT}" mask="url(#${id})">${mask}${f.markup}</g>`, true]];
   }
+  if (p.fit === "free") {
+    const html = layers.map(([markup]) => `<g transform="scale(${flip * s} ${s})">${markup}</g>`).join("");
+    return <g transform={`translate(${a.elbow[0] - E[0] * s} ${a.elbow[1] - E[1] * s})`} dangerouslySetInnerHTML={{ __html: html }} />;
+  }
   const html = layers
     .map(([markup, arm]) => `<g transform="rotate(${deg(E)}) scale(${arm ? stretch : 1} 1) rotate(${-deg(E)}) scale(${flip * s} ${s})">${markup}</g>`)
     .join("");
@@ -306,13 +320,14 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
           const { a, p, sh, el, bend } = armChain(side);
           const clip = `${id}-elbow-${side}`;
           const sleeve = `${id}-sleeve-${side}`;
-          const folds = elbowFolds(a, bend);
+          // A free Turntable forearm carries its own bend.
+          const folds = p.hand3d?.fit === "free" ? [] : elbowFolds(a, bend);
           return (
             <g key={name} transform={`${vt} ${bodyT}`}>
               <g transform={sh}>
                 <Svg markup={a.upper} />
-                {p.hand3d ? (
-                  <g transform={el}>
+                {p.hand3d?.front ? null : p.hand3d ? (
+                  <g transform={p.hand3d.fit === "free" ? undefined : el}>
                     <Hand3d a={a} p={p.hand3d} flip={hand3dFlip(side, p)} id={`${id}-cuff-${side}`} />
                   </g>
                 ) : (
@@ -325,7 +340,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
                 </clipPath>
                 <g clipPath={`url(#${clip})`}>
                   <Svg markup={a.upperFill} />
-                  <Svg markup={a.lowerFill} transform={el} />
+                  {p.hand3d?.fit !== "free" && <Svg markup={a.lowerFill} transform={el} />}
                 </g>
                 {folds.length > 0 && (
                   <>
@@ -355,6 +370,15 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
           );
         }
         return <Svg key={name} markup={view.pieces[name]} transform={name === "legs" ? vt : `${vt} ${bodyT}`} />;
+      })}
+      {Object.keys(view.arms).map((side) => {
+        const { a, p, sh, el } = armChain(side);
+        if (!p.hand3d?.front) return null;
+        return (
+          <g key={`front-${side}`} transform={`${vt} ${bodyT} ${sh} ${p.hand3d.fit === "free" ? "" : el}`}>
+            <Hand3d a={a} p={p.hand3d} flip={hand3dFlip(side, p)} id={`${id}-cuff-${side}`} />
+          </g>
+        );
       })}
     </svg>
   );

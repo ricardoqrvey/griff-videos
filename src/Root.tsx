@@ -7,6 +7,7 @@ import { GRIFF_TALK_RIG_FRAMES, GriffTalkRig } from "./GriffTalkRig";
 import { GRIFF_PRESENT_FRAMES, GriffPresent } from "./GriffPresent";
 import { HAND_SHEET_SIZE, HandSheet } from "./HandSheet";
 import { HAND3D_SHEET_SIZE, Hand3dSheet } from "./Hand3dSheet";
+import { HAND3D_LAB_FRAMES, Hand3dLab } from "./Hand3dLab";
 
 const FPS = 30;
 const DURATION = Math.ceil(36.48 * FPS);
@@ -23,6 +24,7 @@ export const Root: React.FC = () => (
     {/* The same without the Turntable wrist roll: hands just swap. */}
     <Composition id="GriffPresentFlat" component={GriffPresent} defaultProps={{ wristRoll: false }} fps={FPS} durationInFrames={GRIFF_PRESENT_FRAMES} width={1080} height={1080} />
     <Composition id="HandSheet" component={HandSheet} fps={FPS} durationInFrames={1} {...HAND_SHEET_SIZE} />
+    <Composition id="Hand3dLab" component={Hand3dLab} fps={FPS} durationInFrames={HAND3D_LAB_FRAMES} width={1080} height={1080} />
     <Composition id="Hand3dSheet" component={Hand3dSheet} fps={FPS} durationInFrames={1} {...HAND3D_SHEET_SIZE} />
   </>
 );

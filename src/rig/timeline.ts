@@ -69,3 +69,32 @@ export function rollAt(
   }
   return out;
 }
+
+/** Keys for a held Turntable hand: `to` is the view from `at` on (undefined
+ *  gives the rig's own forearm and hand back). Between two views of the same
+ *  set, tilt and fit the turn sweeps over `frames` (15° views, eased); a turn
+ *  past ±180 picks the direction and wraps. */
+export type Hand3dKey = { at: number; to?: Hand3dPose; frames?: number };
+
+const same = (a: Hand3dPose, b: Hand3dPose) => (a.set ?? "hang") === (b.set ?? "hang") && (a.tilt ?? 0) === (b.tilt ?? 0) && a.fit === b.fit;
+const wrapTurn = (t: number) => ((((t + 180) % 360) + 360) % 360) - 180;
+
+export function hand3dAt(frame: number, keys: Hand3dKey[]): Hand3dPose | undefined {
+  let prev: Hand3dPose | undefined;
+  let out: Hand3dPose | undefined;
+  for (const k of keys) {
+    if (frame < k.at) break;
+    out = k.to;
+    if (k.to && prev && same(prev, k.to)) {
+      const n = k.frames ?? 9;
+      const x = Math.min(1, (frame - k.at) / Math.max(1, n - 1));
+      const e = x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2;
+      const turn = prev.turn + (k.to.turn - prev.turn) * e;
+      out = { ...k.to, turn: wrapTurn(Math.round(turn / 15) * 15) };
+    } else if (k.to) {
+      out = { ...k.to, turn: wrapTurn(k.to.turn) };
+    }
+    prev = k.to ? { ...k.to, turn: wrapTurn(k.to.turn) } : undefined;
+  }
+  return out;
+}
