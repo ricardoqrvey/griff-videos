@@ -175,6 +175,9 @@ function elbowFolds(a: ArmData, bend: number) {
 }
 
 const HAND3D_TUCK = 24;
+// Measured on the front view: turn-03 reached 30 stage units past the
+// Turntable palm it follows.
+const TURN_HAND_TUCK = 30;
 // The Turntable cuff ends lower than the rig's sleeve (measured on the front
 // view: 20 stage units), so the whole Turntable arm sits that much up the forearm.
 const HAND3D_LIFT = 20;
@@ -250,10 +253,15 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     // Lay the hand's own axis exactly along the forearm.
     const lean = (x: number, y: number) => (Math.atan2(x, y) * 180) / Math.PI;
     const turn = lean(flip * hand.axis[0], hand.axis[1]) - a.forearmLean;
+    // The turn series shows a long wrist below the cuff: slide those hands up
+    // the forearm, under the sleeve, to meet the Turntable hands of the roll.
+    const tuck = p.hand!.startsWith("turn-") ? TURN_HAND_TUCK : 0;
+    const up = norm([a.elbow[0] - a.wrist[0], a.elbow[1] - a.wrist[1]]);
+    const at: V = [a.wrist[0] + up[0] * tuck, a.wrist[1] + up[1] * tuck];
     return (
       <Svg
         markup={hand.markup}
-        transform={`translate(${a.wrist[0]} ${a.wrist[1]}) rotate(${turn}) scale(${flip * scale} ${scale}) translate(${-hand.wrist[0]} ${-hand.wrist[1]})`}
+        transform={`translate(${at[0]} ${at[1]}) rotate(${turn}) scale(${flip * scale} ${scale}) translate(${-hand.wrist[0]} ${-hand.wrist[1]})`}
       />
     );
   };
