@@ -100,9 +100,9 @@ export function hand3dAt(frame: number, keys: Hand3dKey[]): Hand3dPose | undefin
 }
 
 /** How far in front of the torso a forearm is (ArmPose.across): the share of
- *  the last `frames` frames its elbow was swung in past ACROSS_AT, so the
- *  switch fades over a fixed few frames however slowly the arm moves. */
-export function acrossAt(frame: number, elbowAt: (frame: number) => number, frames = 3): number {
+ *  the last `frames` frames its elbow was swung in past ACROSS_AT. The default
+ *  (1) switches cleanly; more frames fade it, which shows a see-through sleeve. */
+export function acrossAt(frame: number, elbowAt: (frame: number) => number, frames = 1): number {
   let n = 0;
   for (let k = 0; k < frames; k++) if (elbowAt(Math.max(0, frame - k)) < -ACROSS_AT) n++;
   return n / frames;

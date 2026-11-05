@@ -184,7 +184,7 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend)) {
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
   // Each crease runs from the inside edge back toward the joint, bowing toward the shoulder.
   const crease = (start: V, amount: number) => {
-    const len = hw * (0.3 + 0.4 * amount);
+    const len = hw * (0.22 + 0.3 * amount);
     const end: V = [start[0] - c[0] * len, start[1] - c[1] * len];
     const q: V = [(start[0] + end[0]) / 2 - u[0] * hw * 0.1, (start[1] + end[1]) / 2 - u[1] * hw * 0.1];
     return `M${start} Q${q} ${end}`;
@@ -192,7 +192,7 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend)) {
   const tuck = 2; // just inside the outline
   const folds = [crease([V[0] - c[0] * tuck, V[1] - c[1] * tuck], clamp((deg - 12) / 50))];
   if (deg > 50) {
-    const s2: V = [V[0] - c[0] * hw * 0.15 + f[0] * hw * 0.35, V[1] - c[1] * hw * 0.15 + f[1] * hw * 0.35];
+    const s2: V = [V[0] - c[0] * hw * 0.08 + f[0] * hw * 0.2, V[1] - c[1] * hw * 0.08 + f[1] * hw * 0.2];
     folds.push(crease(s2, clamp((deg - 50) / 50) * 0.7));
   }
   return folds;
@@ -205,14 +205,15 @@ const TURN_HAND_TUCK = 30;
 // The Turntable cuff ends lower than the rig's sleeve (measured on the front
 // view: 20 stage units), so the whole Turntable arm sits that much up the forearm.
 const HAND3D_LIFT = 20;
-// How far the elbow drops (stage units, along the upper arm) with the forearm
-// pointing straight up; scaled by how far above horizontal it points.
-const ELBOW_DROP = 70;
-// ...and with the forearm flexed in over the torso.
-const INWARD_DROP = 100, INWARD_DROP_FROM = 50, INWARD_DROP_TO = 110;
+// The elbow joint: the rig's sleeve pieces end in round caps of radius CAP_R,
+// the upper arm's UPPER_CAP above the rig's elbow point and the forearm's
+// LOWER_CAP below it, half-widths UPPER_W and LOWER_W (measured, the same in every view). The joint sits
+// ELBOW_PIVOT further down the arm, where the elbow reads right.
+const UPPER_CAP = 11, LOWER_CAP = 13, UPPER_W = 66, LOWER_W = 67.6, CAP_R = LOWER_W;
+const ELBOW_PIVOT = 70;
 // Elbow bend (degrees, inward) past which the forearm comes over the torso.
-// At rest the vest covers the sleeve's inner edge, so the switch shows a little:
-// acrossAt() in the timeline fades it over a few frames.
+// The elbow's round end stays behind the vest, so only the forearm's inner
+// edge over the vest changes at the switch.
 export const ACROSS_AT = 5;
 
 /** Hand and forearm from one Turntable camera, laid along the rig's forearm:
@@ -323,36 +324,48 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const s = a.swingIn ? { ...SIGN[side], el: -SIGN[side].el } : SIGN[side];
     const sh = `rotate(${p.shoulder * s.sh} ${a.shoulder[0]} ${a.shoulder[1]})`;
     const bend = p.elbow * s.el, shAngle = p.shoulder * s.sh;
-    // With the forearm raised above horizontal the elbow drops: the upper arm
-    // stretches along its axis by up to ELBOW_DROP (forearm straight up), and
-    // the forearm and hand follow the moved joint. Below horizontal, no change.
-    const fore = turnV(norm([a.wrist[0] - a.elbow[0], a.wrist[1] - a.elbow[1]]), shAngle + bend);
-    // Flexed inward over the torso it drops further, eased in between
-    // INWARD_DROP_FROM and INWARD_DROP_TO degrees of inward bend.
-    const inward = Math.min(1, Math.max(0, (-p.elbow - INWARD_DROP_FROM) / (INWARD_DROP_TO - INWARD_DROP_FROM)));
-    const auto = Math.max(ELBOW_DROP * Math.max(0, -fore[1]), INWARD_DROP * inward * inward * (3 - 2 * inward));
-    const drop = a.swingIn || !view.arms[side] ? 0 : p.drop ?? auto;
+    // One fixed joint for every angle: ELBOW_PIVOT below the forearm's own
+    // rounded end. The upper arm stretches so its rounded end sits on the
+    // joint (that end moves rigidly, only the sleeve above it stretches); the
+    // forearm is trimmed to a round end of the same radius there, so the two
+    // circles overlap exactly as it bends.
+    const jointed = !a.swingIn;
+    const D = jointed ? p.drop ?? ELBOW_PIVOT : 0;
     const ua = norm([a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]]);
-    const d: V = [ua[0] * drop, ua[1] * drop];
-    const ul = Math.hypot(a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]);
-    const uDeg = (Math.atan2(ua[1], ua[0]) * 180) / Math.PI;
-    const up = drop
-      ? `translate(${a.shoulder[0]} ${a.shoulder[1]}) rotate(${uDeg}) scale(${(ul + drop) / ul} 1) rotate(${-uDeg}) translate(${-a.shoulder[0]} ${-a.shoulder[1]})`
-      : undefined;
-    const el = `translate(${d[0]} ${d[1]}) rotate(${bend} ${a.elbow[0]} ${a.elbow[1]})`;
+    const fa = norm([a.wrist[0] - a.elbow[0], a.wrist[1] - a.elbow[1]]);
+    // The joint sits on the forearm's own axis, so the sleeve stays straight at rest.
+    const J: V = jointed ? [a.elbow[0] + fa[0] * (LOWER_CAP + D), a.elbow[1] + fa[1] * (LOWER_CAP + D)] : a.elbow;
+    const Cu: V = [a.elbow[0] - ua[0] * UPPER_CAP, a.elbow[1] - ua[1] * UPPER_CAP];
+    // Upper arm: a shear-stretch about the shoulder that carries its rounded
+    // end's centre Cu onto J, and every point on the line across Cu with it.
+    const L = Math.hypot(Cu[0] - a.shoulder[0], Cu[1] - a.shoulder[1]);
+    const dl: V = [J[0] - Cu[0], J[1] - Cu[1]];
+    // Widened a touch to the forearm's width, so the two outlines run on.
+    const nx = -ua[1], ny = ua[0], wk = LOWER_W / UPPER_W - 1;
+    const W = [1 + wk * nx * nx, wk * nx * ny, wk * nx * ny, 1 + wk * ny * ny]; // [a, b, c, d]
+    const M = [1 + (dl[0] * ua[0]) / L, (dl[1] * ua[0]) / L, (dl[0] * ua[1]) / L, 1 + (dl[1] * ua[1]) / L];
+    const mul = (A: number[], B: number[]) => [A[0] * B[0] + A[2] * B[1], A[1] * B[0] + A[3] * B[1], A[0] * B[2] + A[2] * B[3], A[1] * B[2] + A[3] * B[3]];
+    // A linear map about the shoulder, then a shift.
+    const about = (A: number[], t: V = [0, 0]) => {
+      const S0 = a.shoulder;
+      return `matrix(${A[0]} ${A[1]} ${A[2]} ${A[3]} ${S0[0] - A[0] * S0[0] - A[2] * S0[1] + t[0]} ${S0[1] - A[1] * S0[0] - A[3] * S0[1] + t[1]})`;
+    };
+    const up = jointed ? about(mul(M, W)) : undefined;
+    const tip = about(W, dl);
+    const el = `rotate(${bend} ${J[0]} ${J[1]})`;
     const wr = `rotate(${(p.wrist ?? 0) * s.el} ${a.wrist[0]} ${a.wrist[1]})`;
     const across = a.swingIn ? 0 : p.across ?? (p.elbow < -ACROSS_AT ? 1 : 0);
-    // The joint where it now sits, for the patch and folds.
-    const moved: ArmData = { ...a, elbow: [a.elbow[0] + d[0], a.elbow[1] + d[1]], wrist: [a.wrist[0] + d[0], a.wrist[1] + d[1]] };
-    // Only the sleeve up to the joint stretches; the rounded end past it moves
-    // rigidly with the joint, so the forearm still meets the elbow's tip.
-    const tip = `translate(${d[0]} ${d[1]})`;
-    const half = (side: 1 | -1, o: number) => {
-      const c: V = [a.elbow[0] + ua[0] * o, a.elbow[1] + ua[1] * o], n: V = [-ua[1] * 4000, ua[0] * 4000], f: V = [ua[0] * 4000 * side, ua[1] * 4000 * side];
+    // The joint, for the patch and folds.
+    const moved: ArmData = { ...a, elbow: J };
+    const plane = (c: V, ax: V, dir: 1 | -1) => {
+      const n: V = [-ax[1] * 4000, ax[0] * 4000], f: V = [ax[0] * 4000 * dir, ax[1] * 4000 * dir];
       return `M${c[0] + n[0]} ${c[1] + n[1]}L${c[0] - n[0]} ${c[1] - n[1]}L${c[0] - n[0] + f[0]} ${c[1] - n[1] + f[1]}L${c[0] + n[0] + f[0]} ${c[1] + n[1] + f[1]}Z`;
     };
-    const cut = drop ? { near: half(-1, 0.75), far: half(1, -0.75) } : undefined;
-    return { a, p, sh, el, wr, bend, across, shAngle, up, tip, cut, moved };
+    const at = (o: number): V => [Cu[0] + ua[0] * o, Cu[1] + ua[1] * o];
+    const cut = jointed ? { near: plane(at(0.75), ua, -1), far: plane(at(-0.75), ua, 1) } : undefined;
+    // The forearm past the joint, plus a round end on it (forearm's own frame).
+    const trim = jointed ? { plane: plane(J, fa, 1), J } : undefined;
+    return { a, p, sh, el, wr, bend, across, shAngle, up, tip, cut, moved, trim };
   };
 
   /** Upper-arm markup, stretched to the dropped elbow (see armChain). */
@@ -374,7 +387,18 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
    *  `hide` names a mask that keeps the upper arm's patch off the torso, for a
    *  forearm drawn over it. */
   const forearm = (side: string, hide?: string) => {
-    const { a, p, el, bend, shAngle, moved } = armChain(side);
+    const { a, p, el, bend, shAngle, moved, trim } = armChain(side);
+    const trimId = `${id}-trim-${side}`;
+    const trimmed = trim ? `url(#${trimId})` : undefined;
+    // Drawn over the torso, only the forearm past the joint comes in front:
+    // its round end belongs to the elbow, which stays behind the vest.
+    const trimmedDraw = (draw: (clip?: string) => React.ReactNode) =>
+      !trim ? draw() : !hide ? draw(trimmed) : (
+        <>
+          {draw(`url(#${trimId}-plane)`)}
+          <g mask={`url(#${hide})`}>{draw(`url(#${trimId}-disc)`)}</g>
+        </>
+      );
     const black = view.pieces.torso.replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="#000"');
     const unSh = `rotate(${-shAngle} ${a.shoulder[0]} ${a.shoulder[1]})`;
     const clip = `${id}-elbow-${side}`;
@@ -384,12 +408,34 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const folds = free ? [] : elbowFolds(moved, bend);
     return (
       <>
+        {trim && (
+          <>
+            <clipPath id={trimId}>
+              <path d={trim.plane} />
+              <circle cx={trim.J[0]} cy={trim.J[1]} r={CAP_R} />
+            </clipPath>
+            <clipPath id={`${trimId}-plane`}>
+              <path d={trim.plane} />
+            </clipPath>
+            <clipPath id={`${trimId}-disc`}>
+              <circle cx={trim.J[0]} cy={trim.J[1]} r={CAP_R} />
+            </clipPath>
+          </>
+        )}
         {p.hand3d?.front ? null : p.hand3d ? (
-          <g transform={free ? undefined : el}>
+          free ? (
             <Hand3d a={a} p={p.hand3d} flip={hand3dFlip(side, p)} id={`${id}-cuff-${side}`} />
-          </g>
+          ) : (
+            trimmedDraw((clip) => (
+              <g transform={el}>
+                <g clipPath={clip}>
+                  <Hand3d a={a} p={p.hand3d!} flip={hand3dFlip(side, p)} id={`${id}-cuff-${side}${clip?.includes("disc") ? "-d" : ""}`} />
+                </g>
+              </g>
+            ))
+          )
         ) : (
-          <Svg markup={a.lower} transform={el} />
+          trimmedDraw((clip) => <Svg markup={a.lower} transform={el} clipPath={clip} />)
         )}
         {/* Elbow patch: both sleeve fills, clipped to a circle at the joint,
             paint over the outlines where the two pieces cross. */}
@@ -407,7 +453,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
             <g mask={hide ? `url(#${hide})` : undefined}>
               {upperArm(side, a.upperFill, "patch")}
             </g>
-            <Svg markup={a.lowerFill} transform={el} />
+            {trimmedDraw((clip) => <Svg markup={a.lowerFill} transform={el} clipPath={clip} />)}
           </g>
         )}
         {folds.length > 0 && (
@@ -415,7 +461,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
             {/* A mask, not a clipPath: the fills come wrapped in groups. */}
             <mask id={sleeve} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
               {upperArm(side, white(a.upperFill), "fold")}
-              <g transform={el} dangerouslySetInnerHTML={{ __html: white(a.lowerFill) }} />
+              <g transform={el} clipPath={trimmed} dangerouslySetInnerHTML={{ __html: white(a.lowerFill) }} />
             </mask>
             <g mask={`url(#${sleeve})`} fill="none" stroke="#111" strokeWidth={5} strokeLinecap="round">
               {folds.map((d) => (

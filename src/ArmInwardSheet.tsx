@@ -8,12 +8,12 @@ const BACK = 150; // back of the hand to camera
 type Cell = { label: string; arms: { l?: ArmPose; r?: ArmPose } };
 const r = (shoulder: number, elbow: number, extra: Partial<ArmPose> = {}): Cell["arms"] => ({ r: { shoulder, elbow, ...extra } });
 const cells: Cell[] = [
+  { label: "reposo", arms: r(0, 0) },
+  { label: "-30°", arms: r(3, -30) },
   { label: "-60°", arms: r(5, -60) },
   { label: "-90°", arms: r(5, -90) },
   { label: "-110° (tope), dorso", arms: r(5, -110, { hand3d: { turn: BACK } }) },
-  { label: "hombro abierto 12", arms: r(12, -108, { hand3d: { turn: BACK } }) },
-  { label: "hombro cerrado -3", arms: r(-3, -110, { hand3d: { turn: BACK } }) },
-  { label: "brazos cruzados", arms: { l: { shoulder: 4, elbow: -95 }, r: { shoulder: 4, elbow: -100 } } },
+  { label: "hacia afuera, arriba", arms: r(13, 124, { hand: "peace" }) },
 ];
 const COLS = 3;
 export const ARM_INWARD_SHEET_SIZE = { width: CELL.w * COLS, height: CELL.h * Math.ceil(cells.length / COLS) };
