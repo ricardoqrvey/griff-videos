@@ -91,6 +91,8 @@ export type ArmPose = {
    *  across the body (elbow < -ACROSS_AT) in front/back views; acrossAt() in
    *  the timeline eases that switch over a few frames. */
   across?: number;
+  /** Elbow drop in stage units, overriding the automatic one. */
+  drop?: number;
 };
 /** A Turntable view of hand and forearm together, drawn instead of the flat
  *  forearm and hand: turn rolls the hand around the forearm (15° steps). */
@@ -206,6 +208,8 @@ const HAND3D_LIFT = 20;
 // How far the elbow drops (stage units, along the upper arm) with the forearm
 // pointing straight up; scaled by how far above horizontal it points.
 const ELBOW_DROP = 70;
+// ...and with the forearm flexed in over the torso.
+const INWARD_DROP = 100, INWARD_DROP_FROM = 50, INWARD_DROP_TO = 110;
 // Elbow bend (degrees, inward) past which the forearm comes over the torso.
 // At rest the vest covers the sleeve's inner edge, so the switch shows a little:
 // acrossAt() in the timeline fades it over a few frames.
@@ -323,7 +327,11 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     // stretches along its axis by up to ELBOW_DROP (forearm straight up), and
     // the forearm and hand follow the moved joint. Below horizontal, no change.
     const fore = turnV(norm([a.wrist[0] - a.elbow[0], a.wrist[1] - a.elbow[1]]), shAngle + bend);
-    const drop = view.arms[side] && !a.swingIn ? ELBOW_DROP * Math.max(0, -fore[1]) : 0;
+    // Flexed inward over the torso it drops further, eased in between
+    // INWARD_DROP_FROM and INWARD_DROP_TO degrees of inward bend.
+    const inward = Math.min(1, Math.max(0, (-p.elbow - INWARD_DROP_FROM) / (INWARD_DROP_TO - INWARD_DROP_FROM)));
+    const auto = Math.max(ELBOW_DROP * Math.max(0, -fore[1]), INWARD_DROP * inward * inward * (3 - 2 * inward));
+    const drop = a.swingIn || !view.arms[side] ? 0 : p.drop ?? auto;
     const ua = norm([a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]]);
     const d: V = [ua[0] * drop, ua[1] * drop];
     const ul = Math.hypot(a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]);

@@ -6,18 +6,18 @@ import { acrossAt, ArmKey, armAt, Hand3dKey, hand3dAt } from "./rig/timeline";
 // waist up, 1:1.
 const FPS = 30;
 const f = (sec: number) => Math.round(sec * FPS);
-const REST = -105, CHEST = -135; // CHEST: hand flat on the chest
+const REST = -105, BACK = -210; // BACK: back of the hand to camera (150, reached through the chest views)
 const pose = (shoulder: number, elbow: number, hand?: string): ArmPose => ({ shoulder, elbow, hand });
 const key = (sec: number, p: ArmPose): ArmKey => ({ at: f(sec), pose: p });
 const h = (sec: number, to?: Hand3dPose, frames?: number): Hand3dKey => ({ at: f(sec), to, frames });
 // Roll from one Turntable view to another starting at `sec`.
 const roll = (sec: number, from: number, to: number, frames = 10): Hand3dKey[] => [h(sec, { turn: from }), { at: f(sec) + 1, to: { turn: to }, frames }];
-// Back to the resting view, then the rig's own hand.
-const rollOut = (sec: number, from: number): Hand3dKey[] => [...roll(sec, from, REST), h(sec + 0.4)];
+// From the back of the hand (stored as 150) back round the chest side to rest, then the rig's own hand.
+const unroll = (sec: number): Hand3dKey[] => [...roll(sec, 150, REST + 360, 14), h(sec + 0.5)];
 
 const SEGMENTS: [number, string][] = [
   [0, "1. Flexión lenta hacia adentro"],
-  [6.8, "2. Mano al pecho; el hombro se abre y se cierra"],
+  [6.8, "2. Dorso al frente; el hombro se abre y se cierra"],
   [11.4, "3. Brazos cruzados"],
 ];
 export const ARM_INWARD_LAB_FRAMES = f(16.4);
@@ -27,21 +27,21 @@ const RIGHT: ArmKey[] = [
   key(0.6, pose(0, 0)),
   key(1.2, pose(3, -45)),
   key(2.3, pose(4, -90)),
-  key(3.3, pose(5, -125)),
+  key(3.3, pose(5, -110)),
   key(4.7, pose(4, -90)),
   key(5.6, pose(0, 0)),
-  key(7.0, pose(5, -120)),
-  key(8.4, pose(14, -118)),
-  key(9.6, pose(-4, -124)),
+  key(7.0, pose(5, -108)),
+  key(8.4, pose(12, -106)),
+  key(9.6, pose(-3, -110)),
   key(10.6, pose(0, 0)),
   key(12.1, pose(4, -100)),
   key(15.2, pose(0, 0)),
 ];
 const RIGHT3D: Hand3dKey[] = [
-  ...roll(2.8, REST, CHEST, 14),
-  ...rollOut(4.7, CHEST),
-  ...roll(7.0, REST, CHEST, 14),
-  ...rollOut(10.6, CHEST),
+  ...roll(2.8, REST, BACK, 14),
+  ...unroll(4.7),
+  ...roll(7.0, REST, BACK, 14),
+  ...unroll(10.6),
 ];
 // Screen-left arm (Griff's right hand).
 const LEFT: ArmKey[] = [

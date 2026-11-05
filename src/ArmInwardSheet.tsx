@@ -4,18 +4,15 @@ import { ArmPose, Rig, STAGE_W } from "./rig/Rig";
 // Contact sheet: the forearm flexing inward over the torso, step by step, with
 // the dropped elbow (front view, waist up).
 const CELL = { w: 420, h: 500, scale: 0.55, top: 330, left: 230 };
-const CHEST = -135;
+const BACK = 150; // back of the hand to camera
 type Cell = { label: string; arms: { l?: ArmPose; r?: ArmPose } };
 const r = (shoulder: number, elbow: number, extra: Partial<ArmPose> = {}): Cell["arms"] => ({ r: { shoulder, elbow, ...extra } });
 const cells: Cell[] = [
-  { label: "-30°", arms: r(5, -30) },
   { label: "-60°", arms: r(5, -60) },
-  { label: "-90° (horizontal)", arms: r(5, -90) },
-  { label: "-110°", arms: r(5, -110, { hand3d: { turn: CHEST } }) },
-  { label: "-130°", arms: r(5, -130, { hand3d: { turn: CHEST } }) },
-  { label: "-150°", arms: r(5, -150, { hand3d: { turn: CHEST } }) },
-  { label: "hombro abierto 15 / -120", arms: r(15, -120, { hand3d: { turn: CHEST } }) },
-  { label: "hombro cerrado -5 / -120", arms: r(-5, -120, { hand3d: { turn: CHEST } }) },
+  { label: "-90°", arms: r(5, -90) },
+  { label: "-110° (tope), dorso", arms: r(5, -110, { hand3d: { turn: BACK } }) },
+  { label: "hombro abierto 12", arms: r(12, -108, { hand3d: { turn: BACK } }) },
+  { label: "hombro cerrado -3", arms: r(-3, -110, { hand3d: { turn: BACK } }) },
   { label: "brazos cruzados", arms: { l: { shoulder: 4, elbow: -95 }, r: { shoulder: 4, elbow: -100 } } },
 ];
 const COLS = 3;
