@@ -198,7 +198,8 @@ function render() {
     // Hand and forearm from the same Turntable camera: join the cuff to the
     // wrist and draw whichever is nearer the camera on top.
     const [hx, hy] = offsetOf("hand"), [ax, ay] = offsetOf("arm");
-    const hand3 = `<g transform="translate(${hx} ${hy}) translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
+    const hs = D.hand3dScale?.[state.set] ?? 1;
+    const hand3 = `<g transform="translate(${hx} ${hy}) scale(${hs}) translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
     const armT = `translate(${ax} ${ay}) scale(${D.forearm3dScale[state.set]}) translate(${-f3.cuff[0]} ${-f3.cuff[1]})`;
     const arm3 = state.showArm ? `<g transform="${armT}">${f3.markup}</g>` : "";
     const mouth = mouthOf(f3);

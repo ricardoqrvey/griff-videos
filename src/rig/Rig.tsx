@@ -56,6 +56,7 @@ const H3 = hand3dData as unknown as {
   sets: Record<string, Record<string, Hand3dView>>;
   forearm3d: Record<string, Record<string, Forearm3dView>>;
   forearm3dScale: Record<string, number>;
+  hand3dScale: Record<string, number>;
   offsets: Record<string, Offset>;
   handScale: number;
 };
@@ -145,13 +146,12 @@ const turnV = (v: V, deg: number): V => {
 /** Fold lines on the inside of a bent elbow. The first starts right in the
  *  "V" where the inner edges of upper arm and forearm meet (from ~12° of bend);
  *  the second, past ~50°, floats a little further along the forearm. */
-function elbowFolds(a: ArmData, bend: number) {
+function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend)) {
   const E = a.elbow;
   const u = norm([E[0] - a.shoulder[0], E[1] - a.shoulder[1]]);
   const f = turnV(norm([a.wrist[0] - E[0], a.wrist[1] - E[1]]), bend);
   const c = norm([f[0] - u[0], f[1] - u[1]]); // toward the inside of the bend
   const hw = a.patch / 2.3; // half the sleeve width
-  const deg = Math.abs(bend);
   if (deg < 12) return [];
   // Inner edges: each limb's axis pushed half a sleeve toward the inside.
   // Push each axis out to its inner edge, using the sleeve's measured width on that side.
@@ -195,7 +195,7 @@ const HAND3D_LIFT = 20;
 /** Hand and forearm from one Turntable camera, laid along the rig's forearm:
  *  the cuff on the rig's wrist, the far end on its elbow (the forearm is
  *  stretched along its length to fit), the hand at the rig's hand size. */
-function Hand3d({ a, p, flip, id }: { a: ArmData; p: Hand3dPose; flip: number; id: string }) {
+function Hand3d({ a, p, flip, id, over }: { a: ArmData; p: Hand3dPose; flip: number; id: string; over?: string }) {
   const set = p.set ?? "hang";
   const key = `${p.turn},${p.tilt ?? 0}`;
   const v = H3.sets[set][key], f = H3.forearm3d[set][key];
@@ -218,12 +218,14 @@ function Hand3d({ a, p, flip, id }: { a: ArmData; p: Hand3dPose; flip: number; i
   // each one up the forearm, under the cuff, by HAND3D_TUCK (hand-art units).
   const u: V = [(f.elbow[0] - f.cuff[0]) * fs + ax, (f.elbow[1] - f.cuff[1]) * fs + ay];
   const ul = Math.hypot(...u);
-  const tx = hx + (u[0] / ul) * HAND3D_TUCK, ty = hy + (u[1] / ul) * HAND3D_TUCK;
-  const handM = `<g transform="translate(${tx} ${ty}) translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
+  const m = o.mouth === false ? null : o.mouth ?? f.mouth ?? null;
+  // Not where the cuff opening shows: there the hand comes out of the opening as placed.
+  const tuck = m ? 0 : HAND3D_TUCK;
+  const tx = hx + (u[0] / ul) * tuck, ty = hy + (u[1] / ul) * tuck;
+  const handM = `<g transform="translate(${tx} ${ty}) scale(${H3.hand3dScale[set] ?? 1}) translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
   const armM = `<g transform="${armT}">${f.markup}</g>`;
   // Each layer is [markup, part of the forearm?]; only the forearm stretches,
   // about the joint, so the hand keeps its size and place.
-  const m = o.mouth === false ? null : o.mouth ?? f.mouth ?? null;
   let layers: [string, boolean][] = f.front ? [[handM, false], [armM, true]] : [[armM, true], [handM, false]];
   if (m) {
     // Sleeve, hand, then the sleeve again except inside the cuff opening.
@@ -232,8 +234,52 @@ function Hand3d({ a, p, flip, id }: { a: ArmData; p: Hand3dPose; flip: number; i
     layers = [[armM, true], [handM, false], [`<g transform="${armT}" mask="url(#${id})">${mask}${f.markup}</g>`, true]];
   }
   if (p.fit === "free") {
-    const html = layers.map(([markup]) => `<g transform="scale(${flip * s} ${s})">${markup}</g>`).join("");
-    return <g transform={`translate(${a.elbow[0] - E[0] * s} ${a.elbow[1] - E[1] * s})`} dangerouslySetInnerHTML={{ __html: html }} />;
+    const at = `translate(${a.elbow[0] - E[0] * s} ${a.elbow[1] - E[1] * s}) scale(${flip * s} ${s})`;
+    const html = layers.map(([markup]) => `<g transform="${at}">${markup}</g>`).join("");
+    // Seen at length (out to the side), the forearm's rounded far end would show
+    // over the upper arm: paint the upper arm's fill over the joint and add the
+    // crease on the inside of the bend. Toward the camera the forearm is in
+    // front of the upper arm, so it stays whole.
+    const len = Math.hypot(...E) * s;
+    const side = len > Math.hypot(a.elbow[0] - a.wrist[0], a.elbow[1] - a.wrist[1]) * 0.6;
+    const d = norm([-E[0], -E[1]]);
+    const u = norm([a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]]);
+    const bendDeg = (Math.acos(Math.max(-1, Math.min(1, u[0] * d[0] + u[1] * d[1]))) * 180) / Math.PI;
+    const joint: V = [a.elbow[0] + d[0] * 100, a.elbow[1] + d[1] * 100];
+    // The lying forearm is slimmer than the rig's (half-width ~52 on the sheet).
+    const sleeve = { upper: a.sleeve.upper, lower: [52, 52] as [number, number] };
+    const folds = side ? elbowFolds({ ...a, wrist: joint, sleeve }, 0, bendDeg).slice(0, 1) : [];
+    return (
+      <>
+        <g dangerouslySetInnerHTML={{ __html: html }} />
+        {side && (
+          <>
+            <clipPath id={`${id}-joint`}>
+              <circle cx={a.elbow[0]} cy={a.elbow[1]} r={a.patch * 0.55} />
+            </clipPath>
+            {/* Drawn over the torso, the patch must not paint the upper arm over it. */}
+            {over && (
+              <mask id={`${id}-over`} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
+                <rect x={-2000} y={-2000} width={6000} height={6000} fill="#fff" />
+                <g dangerouslySetInnerHTML={{ __html: over }} />
+              </mask>
+            )}
+            <g mask={over ? `url(#${id}-over)` : undefined}>
+              <g clipPath={`url(#${id}-joint)`} dangerouslySetInnerHTML={{ __html: a.upperFill }} />
+            </g>
+            <mask id={`${id}-fold`} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
+              <g dangerouslySetInnerHTML={{ __html: white(a.upperFill) }} />
+              <g dangerouslySetInnerHTML={{ __html: `<g transform="${at}">${white(armM)}</g>` }} />
+            </mask>
+            <g mask={`url(#${id}-fold)`} fill="none" stroke="#111" strokeWidth={5} strokeLinecap="round">
+              {folds.map((path) => (
+                <path key={path} d={path} />
+              ))}
+            </g>
+          </>
+        )}
+      </>
+    );
   }
   const html = layers
     .map(([markup, arm]) => `<g transform="rotate(${deg(E)}) scale(${arm ? stretch : 1} 1) rotate(${-deg(E)}) scale(${flip * s} ${s})">${markup}</g>`)
@@ -338,10 +384,13 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
                 <clipPath id={clip}>
                   <circle cx={a.elbow[0]} cy={a.elbow[1]} r={a.patch} />
                 </clipPath>
-                <g clipPath={`url(#${clip})`}>
-                  <Svg markup={a.upperFill} />
-                  {p.hand3d?.fit !== "free" && <Svg markup={a.lowerFill} transform={el} />}
-                </g>
+                {/* A free Turntable forearm patches its own joint. */}
+                {p.hand3d?.fit !== "free" && (
+                  <g clipPath={`url(#${clip})`}>
+                    <Svg markup={a.upperFill} />
+                    <Svg markup={a.lowerFill} transform={el} />
+                  </g>
+                )}
                 {folds.length > 0 && (
                   <>
                     {/* A mask, not a clipPath: the fills come wrapped in groups. */}
@@ -374,9 +423,12 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
       {Object.keys(view.arms).map((side) => {
         const { a, p, sh, el } = armChain(side);
         if (!p.hand3d?.front) return null;
+        // The torso in the arm's frame (undoing the shoulder turn), in black for a mask.
+        const shAngle = Number(sh.match(/rotate\((-?[\d.e-]+)/)?.[1] ?? 0);
+        const torso = `<g transform="rotate(${-shAngle} ${a.shoulder[0]} ${a.shoulder[1]})">${view.pieces.torso.replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="#000"')}</g>`;
         return (
           <g key={`front-${side}`} transform={`${vt} ${bodyT} ${sh} ${p.hand3d.fit === "free" ? "" : el}`}>
-            <Hand3d a={a} p={p.hand3d} flip={hand3dFlip(side, p)} id={`${id}-cuff-${side}`} />
+            <Hand3d a={a} p={p.hand3d} flip={hand3dFlip(side, p)} id={`${id}-cuff-${side}`} over={torso} />
           </g>
         );
       })}

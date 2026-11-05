@@ -205,6 +205,9 @@ const data = {
   forearm3d,
   // The Turntable forearms came out small next to the hand.
   forearm3dScale: { hang: 1.3, flat: 1.56 },
+  // The lying hands came out smaller than the hanging ones (largest box 244
+  // against 301): grown about the wrist.
+  hand3dScale: { hang: 1, flat: 1.23 },
   // Per-view placement done by hand in the playground (offsets.json next to the sheet).
   offsets: existsSync(join(dirname(sheetFile), "offsets.json"))
     ? JSON.parse(readFileSync(join(dirname(sheetFile), "offsets.json"), "utf8"))

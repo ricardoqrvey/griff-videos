@@ -44,8 +44,8 @@ const RIGHT3D: Hand3dKey[] = [
   h(1.4, { turn: -45 }, 8), h(1.9, { turn: PALM }, 8), h(2.4, { turn: -45 }, 8), h(2.9, { turn: PALM }, 8),
   ...rollOut(3.4),
   ...rollIn(4.7),
-  h(5.7, { turn: -195 }, 14), // palm down: back through the side view to the back of the hand
-  h(6.6, { turn: 345 }, 14), // and over again to the palm
+  h(5.7, { turn: -135 }, 12), // palm down, as far as a wrist turns: back through the side view
+  h(6.6, { turn: PALM }, 12), // and over again to the palm
   ...rollOut(7.6),
   ...rollIn(8.9),
   h(9.9, { turn: -60 }, 6), h(10.2, { turn: 0 }, 7), h(10.5, { turn: -45 }, 6), h(10.8, { turn: PALM }, 6),
