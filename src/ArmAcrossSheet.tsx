@@ -6,6 +6,8 @@ const CELL = { w: 440, h: 520, scale: 0.55, top: 300, left: 200 };
 type Cell = { label: string; arm: ArmPose; side?: "l" | "r" };
 const cells: Cell[] = [
   { label: "brazo arriba", arm: { shoulder: 12, elbow: 122, hand: "index-up" } },
+  { label: "paz", arm: { shoulder: 13, elbow: 124, hand: "peace" } },
+  { label: "medio arriba", arm: { shoulder: 10, elbow: 80, hand: "turn-03" } },
   { label: "mano al pecho", arm: { shoulder: 5, elbow: -120, hand3d: { turn: -135 } } },
   { label: "más cerrado", arm: { shoulder: 5, elbow: -140, hand3d: { turn: -135 } } },
 ];

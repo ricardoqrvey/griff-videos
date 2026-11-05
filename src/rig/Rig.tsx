@@ -336,14 +336,37 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const across = a.swingIn ? 0 : p.across ?? (p.elbow < -ACROSS_AT ? 1 : 0);
     // The joint where it now sits, for the patch and folds.
     const moved: ArmData = { ...a, elbow: [a.elbow[0] + d[0], a.elbow[1] + d[1]], wrist: [a.wrist[0] + d[0], a.wrist[1] + d[1]] };
-    return { a, p, sh, el, wr, bend, across, shAngle, up, moved };
+    // Only the sleeve up to the joint stretches; the rounded end past it moves
+    // rigidly with the joint, so the forearm still meets the elbow's tip.
+    const tip = `translate(${d[0]} ${d[1]})`;
+    const half = (side: 1 | -1, o: number) => {
+      const c: V = [a.elbow[0] + ua[0] * o, a.elbow[1] + ua[1] * o], n: V = [-ua[1] * 4000, ua[0] * 4000], f: V = [ua[0] * 4000 * side, ua[1] * 4000 * side];
+      return `M${c[0] + n[0]} ${c[1] + n[1]}L${c[0] - n[0]} ${c[1] - n[1]}L${c[0] - n[0] + f[0]} ${c[1] - n[1] + f[1]}L${c[0] + n[0] + f[0]} ${c[1] + n[1] + f[1]}Z`;
+    };
+    const cut = drop ? { near: half(-1, 0.75), far: half(1, -0.75) } : undefined;
+    return { a, p, sh, el, wr, bend, across, shAngle, up, tip, cut, moved };
+  };
+
+  /** Upper-arm markup, stretched to the dropped elbow (see armChain). */
+  const upperArm = (side: string, markup: string, key: string) => {
+    const { up, tip, cut } = armChain(side);
+    if (!cut) return <Svg markup={markup} />;
+    const n = `${id}-ua-${side}-${key}`;
+    return (
+      <>
+        <clipPath id={`${n}-a`}><path d={cut.near} /></clipPath>
+        <clipPath id={`${n}-b`}><path d={cut.far} /></clipPath>
+        <Svg markup={markup} transform={up} clipPath={`url(#${n}-a)`} />
+        <Svg markup={markup} transform={tip} clipPath={`url(#${n}-b)`} />
+      </>
+    );
   };
 
   /** Forearm (rig or Turntable), elbow patch and folds, in the shoulder's frame.
    *  `hide` names a mask that keeps the upper arm's patch off the torso, for a
    *  forearm drawn over it. */
   const forearm = (side: string, hide?: string) => {
-    const { a, p, el, bend, shAngle, up, moved } = armChain(side);
+    const { a, p, el, bend, shAngle, moved } = armChain(side);
     const black = view.pieces.torso.replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="#000"');
     const unSh = `rotate(${-shAngle} ${a.shoulder[0]} ${a.shoulder[1]})`;
     const clip = `${id}-elbow-${side}`;
@@ -374,7 +397,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
         {!free && (
           <g clipPath={`url(#${clip})`}>
             <g mask={hide ? `url(#${hide})` : undefined}>
-              <Svg markup={a.upperFill} transform={up} />
+              {upperArm(side, a.upperFill, "patch")}
             </g>
             <Svg markup={a.lowerFill} transform={el} />
           </g>
@@ -383,7 +406,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
           <>
             {/* A mask, not a clipPath: the fills come wrapped in groups. */}
             <mask id={sleeve} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
-              <g transform={up} dangerouslySetInnerHTML={{ __html: white(a.upperFill) }} />
+              {upperArm(side, white(a.upperFill), "fold")}
               <g transform={el} dangerouslySetInnerHTML={{ __html: white(a.lowerFill) }} />
             </mask>
             <g mask={`url(#${sleeve})`} fill="none" stroke="#111" strokeWidth={5} strokeLinecap="round">
@@ -481,11 +504,11 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
         }
         if (name.startsWith("arm-")) {
           const side = name.slice(4);
-          const { sh, a, across, up } = armChain(side);
+          const { sh, a, across } = armChain(side);
           return (
             <g key={name} transform={`${vt} ${bodyT}`}>
               <g transform={sh}>
-                <Svg markup={a.upper} transform={up} />
+                {upperArm(side, a.upper, "arm")}
                 {across < 1 && forearm(side)}
               </g>
             </g>
