@@ -31,6 +31,18 @@ const isNail = (fill) => {
   return lum > 45 && lum < 125 && r >= g && g >= b;
 };
 
+// The Turntable drew the skin darker than the rig's hands (#ccb478 against
+// #e5cf98, the same fix the turn series needed): lift every fill near that
+// tone by the same amount.
+const SKIN = [0xcc, 0xb4, 0x78], RIG_SKIN = [0xe5, 0xcf, 0x98];
+const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const recolour = (markup) =>
+  markup.replace(/fill="(#[0-9a-fA-F]{6})"/g, (all, c) => {
+    const rgb = hex(c);
+    if (Math.hypot(...rgb.map((v, i) => v - SKIN[i])) > 40) return all;
+    return `fill="#${rgb.map((v, i) => Math.min(255, v + RIG_SKIN[i] - SKIN[i]).toString(16).padStart(2, "0")).join("")}"`;
+  });
+
 const sets = { hang: {}, flat: {} };
 for (const g of root.querySelectorAll("g")) {
   const m = (g.getAttribute("id") ?? "").match(/^Generative_Object_(-?\d+)_(-?\d+)_(-2)?$/);
@@ -47,7 +59,7 @@ for (const g of root.querySelectorAll("g")) {
   const wrist =
     set === "hang" ? endCentre(P, centre, [centre[0], b.minY], 12, 14) : endCentre(P, tips, centre, 12, 14);
   sets[set][`${turn},${tilt}`] = {
-    markup: markup(g),
+    markup: recolour(markup(g)),
     wrist: pt(...wrist),
     tips: pt(...tips),
     box: [round(b.minX), round(b.minY), round(b.maxX - b.minX), round(b.maxY - b.minY)],

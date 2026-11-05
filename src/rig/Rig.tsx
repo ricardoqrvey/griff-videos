@@ -174,6 +174,8 @@ function elbowFolds(a: ArmData, bend: number) {
   return folds;
 }
 
+const HAND3D_TUCK = 24;
+
 /** Hand and forearm from one Turntable camera, laid along the rig's forearm:
  *  the cuff on the rig's wrist, the far end on its elbow (the forearm is
  *  stretched along its length to fit), the hand at the rig's hand size. */
@@ -193,7 +195,12 @@ function Hand3d({ a, p, flip, id }: { a: ArmData; p: Hand3dPose; flip: number; i
   const rot = deg(R) - deg(E);
   const stretch = Math.hypot(...R) / (Math.hypot(...E) * s);
   const armT = `translate(${ax} ${ay}) scale(${fs}) translate(${-f.cuff[0]} ${-f.cuff[1]})`;
-  const handM = `<g transform="translate(${hx} ${hy}) translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
+  // The Turntable hands come out of the cuff with a long wrist showing: slide
+  // each one up the forearm, under the cuff, by HAND3D_TUCK (hand-art units).
+  const u: V = [(f.elbow[0] - f.cuff[0]) * fs + ax, (f.elbow[1] - f.cuff[1]) * fs + ay];
+  const ul = Math.hypot(...u);
+  const tx = hx + (u[0] / ul) * HAND3D_TUCK, ty = hy + (u[1] / ul) * HAND3D_TUCK;
+  const handM = `<g transform="translate(${tx} ${ty}) translate(${-v.wrist[0]} ${-v.wrist[1]})">${v.markup}</g>`;
   const armM = `<g transform="${armT}">${f.markup}</g>`;
   // Each layer is [markup, part of the forearm?]; only the forearm stretches,
   // about the joint, so the hand keeps its size and place.

@@ -111,9 +111,10 @@ const faceAt = (t: number): Required<Face> => {
 };
 
 // The wrist rolls in 3D on the way between the resting hand (seen edge-on,
-// Turntable turn 90) and the open palm or a raised gesture (palm to the
-// camera, turn 180), and back. The count and "Done" just cut.
-const SIDE_ON = 90, PALM_ON = 180;
+// thumb toward the camera: Turntable turn -90) and the open palm or a raised
+// gesture (palm to the camera, turn -180), turning the palm out, and back.
+// The count and "Done" just cut.
+const SIDE_ON = -90, PALM_ON = -180;
 const roll = (from?: string, to?: string): [number, number] | null => {
   if (from === THUMB || to === THUMB) return null;
   if (!from && to) return [SIDE_ON, PALM_ON];
