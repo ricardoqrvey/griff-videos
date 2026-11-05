@@ -174,10 +174,17 @@ function overlapLine(a: ArmData, bend: number): { d: string; opacity: number } |
   const plus = n[0] * c[0] + n[1] * c[1] > 0;
   if (!plus) n = [-n[0], -n[1]];
   const w = (plus ? a.sleeve.lower[0] : a.sleeve.lower[1]) - 2; // the outline's middle
-  // Start a little up the forearm from the inside corner, run down to the joint, round the end.
+  // From the inside corner (where the two sleeves' inside edges meet), down
+  // the forearm's edge to the joint, round its end.
   const back: V = [-f[0], -f[1]];
-  const start: V = [E[0] + n[0] * w + f[0] * w * 0.9, E[1] + n[1] * w + f[1] * w * 0.9];
   const P: V = [E[0] + n[0] * w, E[1] + n[1] * w];
+  const un: V = [-u[1], u[0]];
+  const uIn = un[0] * c[0] + un[1] * c[1] > 0;
+  const wu = (uIn ? a.sleeve.upper[0] : a.sleeve.upper[1]) - 2;
+  const p1: V = [E[0] + (uIn ? un[0] : -un[0]) * wu, E[1] + (uIn ? un[1] : -un[1]) * wu];
+  const den = u[0] * f[1] - u[1] * f[0];
+  const along = Math.abs(den) < 1e-6 ? 0 : -((p1[0] - P[0]) * u[1] - (p1[1] - P[1]) * u[0]) / den;
+  const start: V = [P[0] + f[0] * Math.max(0, along), P[1] + f[1] * Math.max(0, along)];
   const th = (40 * Math.PI) / 180;
   const Q: V = [E[0] + (n[0] * Math.cos(th) + back[0] * Math.sin(th)) * w, E[1] + (n[1] * Math.cos(th) + back[1] * Math.sin(th)) * w];
   const sweep = n[0] * back[1] - n[1] * back[0] > 0 ? 1 : 0;
@@ -229,6 +236,9 @@ const TURN_HAND_TUCK = 30;
 // The Turntable cuff ends lower than the rig's sleeve (measured on the front
 // view: 20 stage units), so the whole Turntable arm sits that much up the forearm.
 const HAND3D_LIFT = 20;
+// The Turntable sleeve is a little fuller than the rig's (measured: 76 against
+// 72 stage units half-width at the elbow joint): slimmed so the two meet there.
+const HAND3D_WIDTH = 0.94;
 // The elbow joint: the rig's sleeve pieces end in round caps,
 // the upper arm's UPPER_CAP above the rig's elbow point and the forearm's
 // LOWER_CAP below it, with the fill half-widths below (measured, the same in
@@ -333,7 +343,7 @@ function Hand3d({ a, p, flip, id, over }: { a: ArmData; p: Hand3dPose; flip: num
     );
   }
   const html = layers
-    .map(([markup, arm]) => `<g transform="rotate(${deg(E)}) scale(${arm ? stretch : 1} 1) rotate(${-deg(E)}) scale(${flip * s} ${s})">${markup}</g>`)
+    .map(([markup, arm]) => `<g transform="rotate(${deg(E)}) scale(${arm ? stretch : 1} ${arm ? HAND3D_WIDTH : 1}) rotate(${-deg(E)}) scale(${flip * s} ${s})">${markup}</g>`)
     .join("");
   return <g transform={`translate(${joint[0]} ${joint[1]}) rotate(${rot})`} dangerouslySetInnerHTML={{ __html: html }} />;
 }
@@ -457,7 +467,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const sleeve = `${id}-sleeve-${side}`;
     // A free Turntable forearm carries its own bend and patches its own joint.
     const free = p.hand3d?.fit === "free";
-    const folds = free ? [] : elbowFolds(moved, bend);
+        const folds = free ? [] : elbowFolds(moved, bend);
     const line = free || p.elbow <= 0 ? null : overlapLine(moved, bend);
     return (
       <>
@@ -517,9 +527,8 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
               <g transform={el} clipPath={trimmed} dangerouslySetInnerHTML={{ __html: white(a.lowerFill) }} />
             </mask>
             <g mask={`url(#${sleeve})`} fill="none" stroke="#111" strokeWidth={5} strokeLinecap="round">
-              {folds.map((d) => (
-                <path key={d} d={d} />
-              ))}
+              {/* The short creases give way to the long line. */}
+              {(line?.opacity ?? 0) < 1 && folds.map((d) => <path key={d} d={d} opacity={1 - (line?.opacity ?? 0)} />)}
               {line && <path d={line.d} strokeWidth={4.5} opacity={line.opacity} />}
             </g>
           </>
