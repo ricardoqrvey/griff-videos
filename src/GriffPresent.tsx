@@ -110,11 +110,11 @@ const faceAt = (t: number): Required<Face> => {
   return Object.fromEntries(KEYS.map((n) => [n, (prev[n] ?? 0) + ((cur[n] ?? 0) - (prev[n] ?? 0)) * k])) as Required<Face>;
 };
 
-// The wrist rolls in 3D on the way between the resting hand (seen edge-on,
-// thumb toward the camera: Turntable turn -90) and the open palm or a raised
-// gesture (palm to the camera, turn -180), turning the palm out, and back.
-// The count and "Done" just cut.
-const SIDE_ON = -90, PALM_ON = -180;
+// The wrist rolls in 3D on the way between the resting hand (edge-on, thumb
+// toward the body: Turntable turn -105, like turn-01) and the open palm or a
+// raised gesture (turn -15, like turn-03), through the thumb-forward view
+// (turn-02), and back. The count and "Done" just cut.
+const SIDE_ON = -105, PALM_ON = -15;
 const roll = (from?: string, to?: string): [number, number] | null => {
   if (from === THUMB || to === THUMB) return null;
   if (!from && to) return [SIDE_ON, PALM_ON];

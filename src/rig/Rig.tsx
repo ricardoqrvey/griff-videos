@@ -175,6 +175,9 @@ function elbowFolds(a: ArmData, bend: number) {
 }
 
 const HAND3D_TUCK = 24;
+// The Turntable cuff ends lower than the rig's sleeve (measured on the front
+// view: 20 stage units), so the whole Turntable arm sits that much up the forearm.
+const HAND3D_LIFT = 20;
 
 /** Hand and forearm from one Turntable camera, laid along the rig's forearm:
  *  the cuff on the rig's wrist, the far end on its elbow (the forearm is
@@ -190,7 +193,10 @@ function Hand3d({ a, p, flip, id }: { a: ArmData; p: Hand3dPose; flip: number; i
   // The forearm's far end relative to the joint, mirrored with the hand.
   const E: V = [flip * (ax + fs * (f.elbow[0] - f.cuff[0])), ay + fs * (f.elbow[1] - f.cuff[1])];
   const s = H3.handScale;
-  const R: V = [a.elbow[0] - a.wrist[0], a.elbow[1] - a.wrist[1]];
+  const R0: V = [a.elbow[0] - a.wrist[0], a.elbow[1] - a.wrist[1]];
+  const r0 = Math.hypot(...R0);
+  const joint: V = [a.wrist[0] + (R0[0] / r0) * HAND3D_LIFT, a.wrist[1] + (R0[1] / r0) * HAND3D_LIFT];
+  const R: V = [a.elbow[0] - joint[0], a.elbow[1] - joint[1]];
   const deg = (v: V) => (Math.atan2(v[1], v[0]) * 180) / Math.PI;
   const rot = deg(R) - deg(E);
   const stretch = Math.hypot(...R) / (Math.hypot(...E) * s);
@@ -215,7 +221,7 @@ function Hand3d({ a, p, flip, id }: { a: ArmData; p: Hand3dPose; flip: number; i
   const html = layers
     .map(([markup, arm]) => `<g transform="rotate(${deg(E)}) scale(${arm ? stretch : 1} 1) rotate(${-deg(E)}) scale(${flip * s} ${s})">${markup}</g>`)
     .join("");
-  return <g transform={`translate(${a.wrist[0]} ${a.wrist[1]}) rotate(${rot})`} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <g transform={`translate(${joint[0]} ${joint[1]}) rotate(${rot})`} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig" }) => {
@@ -252,9 +258,9 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     );
   };
 
-  // The Turntable hand is a right hand (thumb to the body when its back faces
-  // the camera); Griff's right hand is the screen-left arm.
-  const hand3dFlip = (side: string, p: ArmPose) => ((side === "r") !== !!p.mirrorHand ? -1 : 1);
+  // The Turntable hand is a left hand (its turns run the same way as the
+  // turn-01…10 series); Griff's left hand is the screen-right arm.
+  const hand3dFlip = (side: string, p: ArmPose) => ((side === "l") !== !!p.mirrorHand ? -1 : 1);
 
   const head = pose.head ?? {};
   // Everything above the legs rides the body lift and lean.
