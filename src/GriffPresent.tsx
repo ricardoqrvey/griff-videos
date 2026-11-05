@@ -135,7 +135,7 @@ const idle = (p: ArmPose, t: number, phase: number): ArmPose => ({
 
 export const GRIFF_PRESENT_FRAMES = Math.ceil(36.48 * FPS);
 
-export const GriffPresent: React.FC<{ wristRoll?: boolean }> = ({ wristRoll = false }) => {
+export const GriffPresent: React.FC<{ wristRoll?: boolean }> = ({ wristRoll = true }) => {
   const frame = useCurrentFrame();
   const { fps, width } = useVideoConfig();
   const t = frame / fps;

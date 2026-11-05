@@ -50,8 +50,8 @@ python3 -m http.server 5178 --directory playground
 ```
 
 The last file feeds the rig: an arm pose with `hand3d: { turn }` draws the Turntable hand and forearm
-instead of the flat ones. `GriffPresent3D` is the reference video with the wrist rolling in 3D between
-the resting hand and the open palm or a raised gesture; `Hand3dSheet` lays the rolls out next to the rig's hands.
+instead of the flat ones. `GriffPresent` (the reference video) rolls the wrist in 3D between the resting
+hand and the open palm or a raised gesture (`GriffPresentFlat` just swaps hands); `Hand3dSheet` lays the rolls out next to the rig's hands.
 
 ## Layout
 
