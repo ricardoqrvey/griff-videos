@@ -203,6 +203,9 @@ const TURN_HAND_TUCK = 30;
 // The Turntable cuff ends lower than the rig's sleeve (measured on the front
 // view: 20 stage units), so the whole Turntable arm sits that much up the forearm.
 const HAND3D_LIFT = 20;
+// How far the elbow drops (stage units, along the upper arm) with the forearm
+// pointing straight up; scaled by how far above horizontal it points.
+const ELBOW_DROP = 70;
 // Elbow bend (degrees, inward) past which the forearm comes over the torso.
 // At rest the vest covers the sleeve's inner edge, so the switch shows a little:
 // acrossAt() in the timeline fades it over a few frames.
@@ -315,24 +318,39 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const p = pose.arms[screenSide(side, mirror) as "l" | "r" | "near"] ?? REST;
     const s = a.swingIn ? { ...SIGN[side], el: -SIGN[side].el } : SIGN[side];
     const sh = `rotate(${p.shoulder * s.sh} ${a.shoulder[0]} ${a.shoulder[1]})`;
-    const el = `rotate(${p.elbow * s.el} ${a.elbow[0]} ${a.elbow[1]})`;
+    const bend = p.elbow * s.el, shAngle = p.shoulder * s.sh;
+    // With the forearm raised above horizontal the elbow drops: the upper arm
+    // stretches along its axis by up to ELBOW_DROP (forearm straight up), and
+    // the forearm and hand follow the moved joint. Below horizontal, no change.
+    const fore = turnV(norm([a.wrist[0] - a.elbow[0], a.wrist[1] - a.elbow[1]]), shAngle + bend);
+    const drop = view.arms[side] && !a.swingIn ? ELBOW_DROP * Math.max(0, -fore[1]) : 0;
+    const ua = norm([a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]]);
+    const d: V = [ua[0] * drop, ua[1] * drop];
+    const ul = Math.hypot(a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]);
+    const uDeg = (Math.atan2(ua[1], ua[0]) * 180) / Math.PI;
+    const up = drop
+      ? `translate(${a.shoulder[0]} ${a.shoulder[1]}) rotate(${uDeg}) scale(${(ul + drop) / ul} 1) rotate(${-uDeg}) translate(${-a.shoulder[0]} ${-a.shoulder[1]})`
+      : undefined;
+    const el = `translate(${d[0]} ${d[1]}) rotate(${bend} ${a.elbow[0]} ${a.elbow[1]})`;
     const wr = `rotate(${(p.wrist ?? 0) * s.el} ${a.wrist[0]} ${a.wrist[1]})`;
     const across = a.swingIn ? 0 : p.across ?? (p.elbow < -ACROSS_AT ? 1 : 0);
-    return { a, p, sh, el, wr, bend: p.elbow * s.el, across, shAngle: p.shoulder * s.sh };
+    // The joint where it now sits, for the patch and folds.
+    const moved: ArmData = { ...a, elbow: [a.elbow[0] + d[0], a.elbow[1] + d[1]], wrist: [a.wrist[0] + d[0], a.wrist[1] + d[1]] };
+    return { a, p, sh, el, wr, bend, across, shAngle, up, moved };
   };
 
   /** Forearm (rig or Turntable), elbow patch and folds, in the shoulder's frame.
    *  `hide` names a mask that keeps the upper arm's patch off the torso, for a
    *  forearm drawn over it. */
   const forearm = (side: string, hide?: string) => {
-    const { a, p, el, bend, shAngle } = armChain(side);
+    const { a, p, el, bend, shAngle, up, moved } = armChain(side);
     const black = view.pieces.torso.replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="#000"');
     const unSh = `rotate(${-shAngle} ${a.shoulder[0]} ${a.shoulder[1]})`;
     const clip = `${id}-elbow-${side}`;
     const sleeve = `${id}-sleeve-${side}`;
     // A free Turntable forearm carries its own bend and patches its own joint.
     const free = p.hand3d?.fit === "free";
-    const folds = free ? [] : elbowFolds(a, bend);
+    const folds = free ? [] : elbowFolds(moved, bend);
     return (
       <>
         {p.hand3d?.front ? null : p.hand3d ? (
@@ -345,7 +363,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
         {/* Elbow patch: both sleeve fills, clipped to a circle at the joint,
             paint over the outlines where the two pieces cross. */}
         <clipPath id={clip}>
-          <circle cx={a.elbow[0]} cy={a.elbow[1]} r={a.patch} />
+          <circle cx={moved.elbow[0]} cy={moved.elbow[1]} r={a.patch} />
         </clipPath>
         {hide && (
           <mask id={hide} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
@@ -356,7 +374,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
         {!free && (
           <g clipPath={`url(#${clip})`}>
             <g mask={hide ? `url(#${hide})` : undefined}>
-              <Svg markup={a.upperFill} />
+              <Svg markup={a.upperFill} transform={up} />
             </g>
             <Svg markup={a.lowerFill} transform={el} />
           </g>
@@ -365,7 +383,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
           <>
             {/* A mask, not a clipPath: the fills come wrapped in groups. */}
             <mask id={sleeve} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
-              <g dangerouslySetInnerHTML={{ __html: white(a.upperFill) }} />
+              <g transform={up} dangerouslySetInnerHTML={{ __html: white(a.upperFill) }} />
               <g transform={el} dangerouslySetInnerHTML={{ __html: white(a.lowerFill) }} />
             </mask>
             <g mask={`url(#${sleeve})`} fill="none" stroke="#111" strokeWidth={5} strokeLinecap="round">
@@ -463,11 +481,11 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
         }
         if (name.startsWith("arm-")) {
           const side = name.slice(4);
-          const { sh, a, across } = armChain(side);
+          const { sh, a, across, up } = armChain(side);
           return (
             <g key={name} transform={`${vt} ${bodyT}`}>
               <g transform={sh}>
-                <Svg markup={a.upper} />
+                <Svg markup={a.upper} transform={up} />
                 {across < 1 && forearm(side)}
               </g>
             </g>
