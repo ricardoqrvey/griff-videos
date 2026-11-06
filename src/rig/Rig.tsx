@@ -160,12 +160,15 @@ const turnV = (v: V, deg: number): V => {
 /** Fold lines on the inside of a bent elbow. The first starts right in the
  *  "V" where the inner edges of upper arm and forearm meet (from ~12° of bend);
  *  the second, past ~50°, floats a little further along the forearm. */
+/** The jointed rig's sleeve edges at the elbow (outline middles). */
+type FoldEdges = { u: V; nu: V; wu: number; wf: number };
+
 /** Creases on the inside of the elbow. With `long` (a forearm raised outward),
  *  past LONG_FOLD_AT degrees the short creases give way to one long fold from
  *  the inside corner into the elbow, growing with the bend. */
-function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false) {
+function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false, g?: FoldEdges) {
   const E = a.elbow;
-  const u = norm([E[0] - a.shoulder[0], E[1] - a.shoulder[1]]);
+  const u = g?.u ?? norm([E[0] - a.shoulder[0], E[1] - a.shoulder[1]]);
   const f = turnV(norm([a.wrist[0] - E[0], a.wrist[1] - E[1]]), bend);
   const c = norm([f[0] - u[0], f[1] - u[1]]); // toward the inside of the bend
   const hw = a.patch / 2.3; // half the sleeve width
@@ -178,8 +181,15 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false
     const w = plus ? widths[0] : widths[1];
     return [E[0] + (plus ? n[0] : -n[0]) * w, E[1] + (plus ? n[1] : -n[1]) * w];
   };
-  const p1 = edge(u, a.sleeve.upper);
-  const p2 = edge(f, a.sleeve.lower);
+  // With the jointed rig's real edges: the upper arm's edge passes J ± its
+  // half-width across nu, running along u; the forearm's is centred on J.
+  const p1 = g
+    ? ((): V => {
+        const plus = g.nu[0] * c[0] + g.nu[1] * c[1] > 0;
+        return [E[0] + (plus ? g.nu[0] : -g.nu[0]) * g.wu, E[1] + (plus ? g.nu[1] : -g.nu[1]) * g.wu];
+      })()
+    : edge(u, a.sleeve.upper);
+  const p2 = edge(f, g ? [g.wf, g.wf] : a.sleeve.lower);
   // Intersect p1 + s·u with p2 + t·f.
   const den = u[0] * f[1] - u[1] * f[0];
   const sAlong = ((p2[0] - p1[0]) * f[1] - (p2[1] - p1[1]) * f[0]) / den;
@@ -394,6 +404,9 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const top = str(Wf);
     // A little inside the upper arm's round end, so its outline keeps its weight.
     const capR = F.w - 3;
+    // Where the upper arm's edges run after the stretch (for the creases).
+    const du = norm([ua[0] * L + dl[0], ua[1] * L + dl[1]]);
+    const edges: FoldEdges | undefined = jointed ? { u: du, nu: nU, wu: F.w + 2, wf: F.w + 2 } : undefined;
     const el = `rotate(${bend} ${J[0]} ${J[1]})`;
     const wr = `rotate(${(p.wrist ?? 0) * s.el} ${a.wrist[0]} ${a.wrist[1]})`;
     const across = a.swingIn ? 0 : p.across ?? (p.elbow < -ACROSS_AT ? 1 : 0);
@@ -413,7 +426,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const cut = jointed ? { top: plane(at(-L + 0.75), ua, -1), near: band(-L - 0.75, 0.75), far: plane(at(-0.75), ua, 1) } : undefined;
     // The forearm past the joint, plus a round end on it (forearm's own frame).
     const trim = jointed ? { plane: plane(J, fa, 1), J, r: capR } : undefined;
-    return { a, p, sh, el, wr, bend, across, shAngle, up, tip, top, cut, moved, trim };
+    return { a, p, sh, el, wr, bend, across, shAngle, up, tip, top, cut, moved, trim, edges };
   };
 
   /** Upper-arm markup, stretched to the dropped elbow (see armChain). */
@@ -437,7 +450,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
    *  `hide` names a mask that keeps the upper arm's patch off the torso, for a
    *  forearm drawn over it. */
   const forearm = (side: string, hide?: string) => {
-    const { a, p, el, bend, shAngle, moved, trim } = armChain(side);
+    const { a, p, el, bend, shAngle, moved, trim, edges } = armChain(side);
     const trimId = `${id}-trim-${side}`;
     const trimmed = trim ? `url(#${trimId})` : undefined;
     // Drawn over the torso, only the forearm past the joint comes in front:
@@ -455,7 +468,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const sleeve = `${id}-sleeve-${side}`;
     // A free Turntable forearm carries its own bend and patches its own joint.
     const free = p.hand3d?.fit === "free";
-        const folds = free ? [] : elbowFolds(moved, bend, Math.abs(bend), p.elbow > 0);
+        const folds = free ? [] : elbowFolds(moved, bend, Math.abs(bend), p.elbow > 0, edges);
     return (
       <>
         {trim && (
