@@ -6,7 +6,7 @@ import { acrossAt, ArmKey, armAt, Hand3dKey, hand3dAt } from "./rig/timeline";
 // vest on its own once the elbow bends inward), front view, waist up, 1:1.
 const FPS = 30;
 const f = (sec: number) => Math.round(sec * FPS);
-const REST = -105, PALM = -15, CHEST = -135; // CHEST: hand flat on the chest
+const REST = -105, PALM = -15, CHEST = -210; // CHEST: back of the hand to camera (150, through the chest views)
 const pose = (shoulder: number, elbow: number, hand?: string): ArmPose => ({ shoulder, elbow, hand });
 const key = (sec: number, p: ArmPose): ArmKey => ({ at: f(sec), pose: p });
 const h = (sec: number, to?: Hand3dPose, frames?: number): Hand3dKey => ({ at: f(sec), to, frames });
@@ -43,9 +43,11 @@ const RIGHT: ArmKey[] = [
 const RIGHT3D: Hand3dKey[] = [
   ...roll(0.4, REST, CHEST, 14),
   ...rollOut(3.2, CHEST),
-  h(4.6, { turn: REST }), // the side view rides the forearm across the belly
-  h(8.8),
+  ...roll(4.7, REST, CHEST, 14), // back of the hand across the belly
+  ...rollOut(8.4, CHEST),
   ...roll(9.2, REST, PALM),
+  { at: f(10.3), to: { turn: CHEST }, frames: 12 }, // over the body: back of the hand
+  { at: f(11.6), to: { turn: PALM }, frames: 12 },
   ...rollOut(12.6, PALM),
   ...roll(13.6, REST, CHEST, 14),
   { at: f(15.0), to: { turn: PALM }, frames: 14 }, // back of the hand round to the palm as it opens out
@@ -65,6 +67,8 @@ const LEFT3D: Hand3dKey[] = [
   ...roll(5.4, REST, PALM),
   h(6.3, { turn: -45 }, 8), h(6.8, { turn: PALM }, 8),
   ...rollOut(7.7, PALM),
+  ...roll(18.1, REST, CHEST, 14),
+  ...rollOut(21.4, CHEST),
 ];
 
 const idle = (p: ArmPose, t: number, phase: number): ArmPose => ({

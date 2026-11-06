@@ -20,7 +20,7 @@ const SEGMENTS: [number, string][] = [
   [6.8, "2. Dorso al frente; el hombro se abre y se cierra"],
   [11.4, "3. Brazos cruzados"],
 ];
-export const ARM_INWARD_LAB_FRAMES = f(16.4);
+export const ARM_INWARD_LAB_FRAMES = f(16.6);
 
 // Screen-right arm (Griff's left hand).
 const RIGHT: ArmKey[] = [
@@ -37,18 +37,22 @@ const RIGHT: ArmKey[] = [
   key(12.1, pose(4, -100)),
   key(15.2, pose(0, 0)),
 ];
+// Bent inward the hand always shows its back: it rolls round as the forearm
+// starts in and back as it comes down (the side view across the body reads oddly).
 const RIGHT3D: Hand3dKey[] = [
-  ...roll(2.8, REST, BACK, 14),
-  ...unroll(4.7),
-  ...roll(7.0, REST, BACK, 14),
-  ...unroll(10.6),
+  ...roll(1.3, REST, BACK, 14),
+  ...unroll(5.7),
+  ...roll(7.1, REST, BACK, 14),
+  ...unroll(10.75),
+  ...roll(12.2, REST, BACK, 14),
+  ...unroll(15.35),
 ];
 // Screen-left arm (Griff's right hand).
 const LEFT: ArmKey[] = [
   key(11.8, pose(4, -95)),
   key(15.0, pose(0, 0)),
 ];
-const LEFT3D: Hand3dKey[] = [];
+const LEFT3D: Hand3dKey[] = [...roll(11.9, REST, BACK, 14), ...unroll(15.15)];
 
 const idle = (p: ArmPose, t: number, phase: number): ArmPose => ({
   ...p,

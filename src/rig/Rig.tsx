@@ -156,6 +156,11 @@ const norm = (v: V): V => {
   const l = Math.hypot(v[0], v[1]) || 1;
   return [v[0] / l, v[1] / l];
 };
+/** Point p turned by deg about c. */
+const turnAbout = (p: V, c: V, deg: number): V => {
+  const r = (deg * Math.PI) / 180;
+  return [c[0] + (p[0] - c[0]) * Math.cos(r) - (p[1] - c[1]) * Math.sin(r), c[1] + (p[0] - c[0]) * Math.sin(r) + (p[1] - c[1]) * Math.cos(r)];
+};
 const turnV = (v: V, deg: number): V => {
   const t = (deg * Math.PI) / 180;
   return [v[0] * Math.cos(t) - v[1] * Math.sin(t), v[0] * Math.sin(t) + v[1] * Math.cos(t)];
@@ -165,7 +170,7 @@ const turnV = (v: V, deg: number): V => {
  *  "V" where the inner edges of upper arm and forearm meet (from ~12° of bend);
  *  the second, past ~50°, floats a little further along the forearm. */
 /** The jointed rig's sleeve edges at the elbow (outline middles). */
-type FoldEdges = { u: V; nu: V; wu: number; fo: number; tJ: number; plusNarrow: boolean };
+type FoldEdges = { u: V; nu: V; wu: number; fo: number; tJ: number; plusNarrow: boolean; vest?: V[] };
 // The forearm sleeve's outline half-widths along its axis (distance from the
 // rig's elbow point), narrow and wide side (measured, the same in every view).
 const LOWER_T = [13, 40, 83, 120, 160, 200];
@@ -227,6 +232,21 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false
       t = g.tJ + (V[0] - E[0]) * f[0] + (V[1] - E[1]) * f[1];
     }
   } else V = meet(edge(f, a.sleeve.lower));
+  // Over the torso the upper arm's inside edge is under the vest: the corner
+  // that shows is where the forearm's edge meets the vest's (its outline's middle).
+  if (g?.vest) {
+    for (let i = 1; i < g.vest.length; i++) {
+      const A = g.vest[i - 1], B = g.vest[i], e: V = [B[0] - A[0], B[1] - A[1]];
+      const dd = f[0] * e[1] - f[1] * e[0];
+      if (Math.abs(dd) < 1e-9) continue;
+      const w: V = [A[0] - V[0], A[1] - V[1]];
+      const t = (w[0] * e[1] - w[1] * e[0]) / dd, q = (w[0] * f[1] - w[1] * f[0]) / dd;
+      if (q >= 0 && q <= 1) {
+        if (t + 2 < 0) V = [V[0] + f[0] * (t + 2), V[1] + f[1] * (t + 2)];
+        break;
+      }
+    }
+  }
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
   // Each crease runs from the inside edge back toward the joint, bowing toward the shoulder.
   const crease = (start: V, amount: number) => {
@@ -563,7 +583,8 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const sleeve = `${id}-sleeve-${side}`;
     // A free Turntable forearm carries its own bend and patches its own joint.
     const free = p.hand3d?.fit === "free";
-        const folds = free ? [] : elbowFolds(moved, bend, Math.abs(bend), true, edges, p.elbow < 0 ? INWARD_FOLD_AT : LONG_FOLD_AT);
+        const vestArm = hide && VEST[src]?.[side] ? VEST[src][side].map((q) => turnAbout(q, a.shoulder, -shAngle)) : undefined;
+        const folds = free ? [] : elbowFolds(moved, bend, Math.abs(bend), true, edges && { ...edges, vest: vestArm }, p.elbow < 0 ? INWARD_FOLD_AT : LONG_FOLD_AT);
     return (
       <>
         {trim && (
