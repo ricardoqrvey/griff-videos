@@ -161,7 +161,19 @@ const turnV = (v: V, deg: number): V => {
  *  "V" where the inner edges of upper arm and forearm meet (from ~12° of bend);
  *  the second, past ~50°, floats a little further along the forearm. */
 /** The jointed rig's sleeve edges at the elbow (outline middles). */
-type FoldEdges = { u: V; nu: V; wu: number; wf: number };
+type FoldEdges = { u: V; nu: V; wu: number; fo: number; tJ: number; plusNarrow: boolean };
+// The forearm sleeve's outline half-widths along its axis (distance from the
+// rig's elbow point), narrow and wide side (measured, the same in every view).
+const LOWER_T = [13, 40, 83, 120, 160, 200];
+const LOWER_NARROW = [68.7, 69.5, 70.6, 71.8, 73.1, 66.1];
+const LOWER_WIDE = [70.8, 71.6, 73.3, 74.8, 73.7, 65.3];
+const lowerHalf = (t: number, narrow: boolean) => {
+  const w = narrow ? LOWER_NARROW : LOWER_WIDE;
+  if (t <= LOWER_T[0]) return w[0];
+  for (let i = 1; i < LOWER_T.length; i++)
+    if (t <= LOWER_T[i]) return w[i - 1] + ((w[i] - w[i - 1]) * (t - LOWER_T[i - 1])) / (LOWER_T[i] - LOWER_T[i - 1]);
+  return w[w.length - 1];
+};
 
 /** Creases on the inside of the elbow. With `long` (a forearm raised outward),
  *  past LONG_FOLD_AT degrees the short creases give way to one long fold from
@@ -189,11 +201,28 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false
         return [E[0] + (plus ? g.nu[0] : -g.nu[0]) * g.wu, E[1] + (plus ? g.nu[1] : -g.nu[1]) * g.wu];
       })()
     : edge(u, a.sleeve.upper);
-  const p2 = edge(f, g ? [g.wf, g.wf] : a.sleeve.lower);
-  // Intersect p1 + s·u with p2 + t·f.
   const den = u[0] * f[1] - u[1] * f[0];
-  const sAlong = ((p2[0] - p1[0]) * f[1] - (p2[1] - p1[1]) * f[0]) / den;
-  const V: V = [p1[0] + u[0] * sAlong, p1[1] + u[1] * sAlong];
+  const meet = (p2: V): V => {
+    // Intersect p1 + s·u with p2 + t·f.
+    const sAlong = ((p2[0] - p1[0]) * f[1] - (p2[1] - p1[1]) * f[0]) / den;
+    return [p1[0] + u[0] * sAlong, p1[1] + u[1] * sAlong];
+  };
+  let V: V;
+  if (g) {
+    // The sleeve widens toward the cuff, so take its width where the corner
+    // lands (a few rounds to settle), from the forearm's own axis.
+    const nP: V = [-f[1], f[0]];
+    const plus = nP[0] * c[0] + nP[1] * c[1] > 0;
+    const nIn: V = plus ? nP : [-nP[0], -nP[1]];
+    const A: V = [E[0] - nP[0] * g.fo, E[1] - nP[1] * g.fo];
+    let t = g.tJ;
+    V = E;
+    for (let k = 0; k < 4; k++) {
+      const w = lowerHalf(t, plus === g.plusNarrow) - 2;
+      V = meet([A[0] + nIn[0] * w, A[1] + nIn[1] * w]);
+      t = g.tJ + (V[0] - E[0]) * f[0] + (V[1] - E[1]) * f[1];
+    }
+  } else V = meet(edge(f, a.sleeve.lower));
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
   // Each crease runs from the inside edge back toward the joint, bowing toward the shoulder.
   const crease = (start: V, amount: number) => {
@@ -407,7 +436,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const capR = F.w - 3;
     // Where the upper arm's edges run after the stretch (for the creases).
     const du = norm([ua[0] * L + dl[0], ua[1] * L + dl[1]]);
-    const edges: FoldEdges | undefined = jointed ? { u: du, nu: nU, wu: F.w + 2, wf: F.w + 2 } : undefined;
+    const edges: FoldEdges | undefined = jointed ? { u: du, nu: nU, wu: F.w + 2, fo: F.o, tJ: LOWER_CAP + D, plusNarrow: a.sleeve.lower[0] < a.sleeve.lower[1] } : undefined;
     const el = `rotate(${bend} ${J[0]} ${J[1]})`;
     const wr = `rotate(${(p.wrist ?? 0) * s.el} ${a.wrist[0]} ${a.wrist[1]})`;
     const across = a.swingIn ? 0 : p.across ?? (p.elbow < -ACROSS_AT ? 1 : 0);
