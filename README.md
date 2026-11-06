@@ -32,6 +32,8 @@ Lipsync uses [Rhubarb Lip Sync](https://github.com/DanielSWolf/rhubarb-lip-sync)
 
 ## Compositions
 
+- `GriffPresent`: the reference video (rhythm, gestures, 3D wrist roll).
+- `GriffMix`: the same audio with inward gestures mixed in.
 - `GriffTalkRig`: Griff speaking Griff_1's audio with the Illustrator rig (lipsync, brows, gestures, turns).
 - `RigTest`: gestures, hand swaps and a full 360° turn.
 - `FaceSheet`: every mouth shape and brow on every view, for tuning.
@@ -56,10 +58,22 @@ longer moves: rolls held in a gesture, palm to back, a raised hand that wobbles,
 (`fit: "free"`, drawn over the torso with `front`) swinging round toward the camera.
 
 Arms in front/back views can swing the forearm in across the body (negative elbow): past `ACROSS_AT`
-the forearm, elbow and hand are drawn over the vest while the upper arm stays behind it. Pass
-`across: acrossAt(frame, elbowAt)` from the timeline so the switch fades over three frames.
-`ArmAcrossLab` tries hand on chest, a forearm resting across the belly, palm-up crossing, chest to open
-gesture, and one arm across while the other is raised; `ArmAcrossSheet` lays poses out side by side.
+the forearm and hand are drawn over the vest while the upper arm stays behind it. Pass
+`across: acrossAt(frame, elbowAt)` from the timeline; it switches in one frame (fading shows a
+see-through sleeve). At slight bends the forearm's inside edge is pared back to the vest's line at the
+joint (`src/data/griff.vest.json`, measured by `scripts/vest-edges.mjs`) so it doesn't step out.
+
+The elbow bends about one fixed joint, `ELBOW_PIVOT` below the forearm's own rounded end: the upper
+arm shear-stretches so its rounded end sits on the joint and the forearm is trimmed to a round end of
+the same radius there. Raised forearms close the upper arm in by up to `ARM_CLOSE`. Folds: outward,
+short creases up to `LONG_FOLD_AT`, then one long fold from the inside corner, nearly parallel to the
+forearm; inward, only the long fold, growing from `INWARD_FOLD_FROM` (over the vest it starts where
+the forearm meets the vest's edge). Bent inward the hand shows its back (Turntable 150, reached as
+-210 through the chest views), rolling in as the forearm starts in and back as it comes down.
+
+Labs and sheets: `ArmInwardLab` / `ArmInwardSheet` (the inward flex by angle, arms crossed),
+`ArmAcrossLab` / `ArmAcrossSheet` (earlier across-the-body tries). `GriffMix` is `GriffPresent`'s
+audio with inward gestures mixed in (hand to chest, forearm across, hand held in, arms crossed).
 
 ## Layout
 
