@@ -3,6 +3,7 @@
 // hands can be swapped for any hand in the library.
 import rigData from "../data/griff.rig.json";
 import hand3dData from "../data/griff.hand3d.json";
+import vestData from "../data/griff.vest.json";
 import { Face, FacePose } from "./Face";
 
 type Pt = [number, number];
@@ -52,6 +53,9 @@ const RIG = rigData as unknown as { views: Record<string, ViewData>; hands: Reco
 type Hand3dView = { markup: string; wrist: Pt };
 type Forearm3dView = { markup: string; cuff: Pt; elbow: Pt; front: boolean; mouth?: { x: number; y: number; rx: number; ry: number; rot: number } };
 type Offset = { hand?: Pt; arm?: Pt; mouth?: Forearm3dView["mouth"] | false };
+// The vest's outer edge beside each arm, [x, y] every 20 units down (scripts/vest-edges.mjs).
+const VEST = vestData as unknown as Record<string, Record<string, V[]>>;
+
 const H3 = hand3dData as unknown as {
   sets: Record<string, Record<string, Hand3dView>>;
   forearm3d: Record<string, Record<string, Forearm3dView>>;
@@ -175,10 +179,10 @@ const lowerHalf = (t: number, narrow: boolean) => {
   return w[w.length - 1];
 };
 
-/** Creases on the inside of the elbow. With `long` (a forearm raised outward),
+/** Creases on the inside of the elbow. With `long`,
  *  past LONG_FOLD_AT degrees the short creases give way to one long fold from
  *  the inside corner into the elbow, growing with the bend. */
-function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false, g?: FoldEdges) {
+function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false, g?: FoldEdges, longAt = LONG_FOLD_AT) {
   const E = a.elbow;
   const u = g?.u ?? norm([E[0] - a.shoulder[0], E[1] - a.shoulder[1]]);
   const f = turnV(norm([a.wrist[0] - E[0], a.wrist[1] - E[1]]), bend);
@@ -233,16 +237,16 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false
   };
   const tuck = 2; // just inside the outline
   const V0: V = [V[0] - c[0] * tuck, V[1] - c[1] * tuck];
-  if (long && deg >= LONG_FOLD_AT) {
+  if (long && deg >= longAt) {
     // Starts as long as the first crease was and grows to most of the way to
     // the joint by LONG_FOLD_AT + 40. It leaves the corner along the forearm
     // (parallel to its axis) and bends only a little toward the elbow, so it
     // keeps the forearm's angle as the arm moves.
-    const short = hw * (0.22 + 0.3 * clamp((LONG_FOLD_AT - 12) / 50));
+    const short = hw * (0.22 + 0.3 * clamp((longAt - 12) / 50));
     // ...but never more than 3/4 of the way across to the arm's far edge.
     const across = (a.sleeve.upper[0] + a.sleeve.upper[1]) / Math.max(0.2, Math.abs(f[0] * u[1] - f[1] * u[0]));
     const full = Math.min(hw * 1.8, across * 0.75);
-    const len = short + (Math.max(short, full) - short) * clamp((deg - LONG_FOLD_AT) / 40);
+    const len = short + (Math.max(short, full) - short) * clamp((deg - longAt) / 40);
     const q: V = [V0[0] - f[0] * len * 0.5, V0[1] - f[1] * len * 0.5];
     const t = norm([-f[0] * 0.7 - c[0] * 0.3, -f[1] * 0.7 - c[1] * 0.3]);
     const end: V = [q[0] + t[0] * len * 0.5, q[1] + t[1] * len * 0.5];
@@ -276,6 +280,9 @@ const UPPER_FILL: [number, number] = [63.5, 67.9], LOWER_FILL: [number, number] 
 const ELBOW_PIVOT = 70;
 const ARM_CLOSE = 8;
 const LONG_FOLD_AT = 70;
+const VEST_EASE = 80; // well short of the cuff
+// Bent inward the second short crease never shows: one long fold from here.
+const INWARD_FOLD_AT = 50;
 // Elbow bend (degrees, inward) past which the forearm comes over the torso.
 // The elbow's round end stays behind the vest, so only the forearm's inner
 // edge over the vest changes at the switch.
@@ -456,7 +463,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
     const cut = jointed ? { top: plane(at(-L + 0.75), ua, -1), near: band(-L - 0.75, 0.75), far: plane(at(-0.75), ua, 1) } : undefined;
     // The forearm past the joint, plus a round end on it (forearm's own frame).
     const trim = jointed ? { plane: plane(J, fa, 1), J, r: capR } : undefined;
-    return { a, p, sh, el, wr, bend, across, shAngle, up, tip, top, cut, moved, trim, edges };
+    return { a, p, sh, el, wr, bend, across, shAngle, up, tip, top, cut, moved, trim, edges, fw: F.w };
   };
 
   /** Upper-arm markup, stretched to the dropped elbow (see armChain). */
@@ -480,25 +487,83 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
    *  `hide` names a mask that keeps the upper arm's patch off the torso, for a
    *  forearm drawn over it. */
   const forearm = (side: string, hide?: string) => {
-    const { a, p, el, bend, shAngle, moved, trim, edges } = armChain(side);
+    const { a, p, el, bend, shAngle, moved, trim, edges, fw } = armChain(side);
     const trimId = `${id}-trim-${side}`;
     const trimmed = trim ? `url(#${trimId})` : undefined;
     // Drawn over the torso, only the forearm past the joint comes in front:
     // its round end belongs to the elbow, which stays behind the vest.
+    // Over the torso at a slight bend the forearm runs along the vest's edge,
+    // a few units past it, while the upper arm above is tucked under it: its
+    // inside edge would step out at the joint. Pare that edge back to the
+    // vest's line at the joint, easing out to its own edge VEST_EASE below
+    // (gone by 50° of bend), and draw the pared edge's outline.
+    const pare = ((): { clip: string; line: string } | null => {
+      const vest = VEST[src]?.[side];
+      if (!hide || !trim || !vest || p.hand3d?.fit === "free") return null;
+      const k = Math.min(1, Math.max(0, (50 - Math.abs(bend)) / 20));
+      if (k <= 0) return null;
+      const J = moved.elbow;
+      const f = turnV(norm([a.wrist[0] - a.elbow[0], a.wrist[1] - a.elbow[1]]), bend);
+      const u0 = norm([a.elbow[0] - a.shoulder[0], a.elbow[1] - a.shoulder[1]]);
+      let n: V = [-f[1], f[0]];
+      const cIn = norm([f[0] - u0[0], f[1] - u0[1]]);
+      if (n[0] * cIn[0] + n[1] * cIn[1] < 0) n = [-n[0], -n[1]];
+      // The vest's edge in the arm's frame (the arm turns with the shoulder).
+      const r = (-shAngle * Math.PI) / 180, S0 = a.shoulder;
+      const pts = vest.map(([x, y]): V => [S0[0] + (x - S0[0]) * Math.cos(r) - (y - S0[1]) * Math.sin(r), S0[1] + (x - S0[0]) * Math.sin(r) + (y - S0[1]) * Math.cos(r)]);
+      // How far from the forearm's axis, across it at the joint, the vest's edge lies.
+      let dv: number | null = null;
+      for (let i = 1; i < pts.length; i++) {
+        const A = pts[i - 1], B = pts[i], e: V = [B[0] - A[0], B[1] - A[1]];
+        const den = n[0] * e[1] - n[1] * e[0];
+        if (Math.abs(den) < 1e-9) continue;
+        const w: V = [A[0] - J[0], A[1] - J[1]];
+        const t = (w[0] * e[1] - w[1] * e[0]) / den, q = (w[0] * n[1] - w[1] * n[0]) / den;
+        if (q >= 0 && q <= 1 && t > 0) { dv = t; break; }
+      }
+      const edge = fw + 4; // the outline's outer edge
+      if (dv === null) return null;
+      const d = Math.min(25, edge - (dv + 4)) * k; // keep the vest's outline width
+      if (d <= 0) return null;
+      const at = (s: number, o: number): V => [J[0] + f[0] * s + n[0] * o, J[1] + f[1] * s + n[1] * o];
+      const b0 = edge - d, far = 3000;
+      // The chord runs out past the sleeve's real edge; the outline drawn on it
+      // is kept to the sleeve, so it runs into the sleeve's own outline.
+      const clip = [at(-far, b0), at(0, b0), at(VEST_EASE, edge + 8), at(far, edge + 8), at(far, -far), at(-far, -far)].map((q) => q.join(" ")).join(" L");
+      const line = `M${at(0, b0 - 2)} L${at(VEST_EASE, edge + 6)}`;
+      return { clip: `M${clip}Z`, line };
+    })();
+    const pareId = `${id}-pare-${side}`;
     const trimmedDraw = (draw: (clip?: string) => React.ReactNode) =>
       !trim ? draw() : !hide ? draw(trimmed) : (
         <>
-          {draw(`url(#${trimId}-plane)`)}
+          {pare && (
+            <clipPath id={`${pareId}-${trimmedDrawN++}`}>
+              <path d={pare.clip} />
+            </clipPath>
+          )}
+          <g clipPath={pare ? `url(#${pareId}-${trimmedDrawN - 1})` : undefined}>
+            {draw(`url(#${trimId}-plane)`)}
+            {pare && (
+              <>
+                <mask id={`${pareId}-m${trimmedDrawN - 1}`} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
+                  <g transform={el} fill="#fff" dangerouslySetInnerHTML={{ __html: white(a.lower) }} />
+                </mask>
+                <path d={pare.line} fill="none" stroke="#000" strokeWidth={4} mask={`url(#${pareId}-m${trimmedDrawN - 1})`} />
+              </>
+            )}
+          </g>
           <g mask={`url(#${hide})`}>{draw(`url(#${trimId}-disc)`)}</g>
         </>
       );
+    let trimmedDrawN = 0;
     const black = view.pieces.torso.replace(/fill="#[0-9a-fA-F]{3,6}"/g, 'fill="#000"');
     const unSh = `rotate(${-shAngle} ${a.shoulder[0]} ${a.shoulder[1]})`;
     const clip = `${id}-elbow-${side}`;
     const sleeve = `${id}-sleeve-${side}`;
     // A free Turntable forearm carries its own bend and patches its own joint.
     const free = p.hand3d?.fit === "free";
-        const folds = free ? [] : elbowFolds(moved, bend, Math.abs(bend), p.elbow > 0, edges);
+        const folds = free ? [] : elbowFolds(moved, bend, Math.abs(bend), true, edges, p.elbow < 0 ? INWARD_FOLD_AT : LONG_FOLD_AT);
     return (
       <>
         {trim && (
@@ -535,6 +600,11 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
         <clipPath id={clip}>
           <circle cx={moved.elbow[0]} cy={moved.elbow[1]} r={a.patch} />
         </clipPath>
+        {/* A Turntable forearm is shaped a little differently from the rig's:
+            its fill patch keeps to the joint, where the round ends meet. */}
+        <clipPath id={`${clip}-low`}>
+          <circle cx={moved.elbow[0]} cy={moved.elbow[1]} r={p.hand3d ? fw + 8 : a.patch} />
+        </clipPath>
         {hide && (
           <mask id={hide} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
             <rect x={-2000} y={-2000} width={6000} height={6000} fill="#fff" />
@@ -542,12 +612,16 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
           </mask>
         )}
         {!free && (
-          <g clipPath={`url(#${clip})`}>
-            <g mask={hide ? `url(#${hide})` : undefined}>
-              {upperArm(side, a.upperFill, "patch")}
+          <>
+            <g clipPath={`url(#${clip})`}>
+              <g mask={hide ? `url(#${hide})` : undefined}>
+                {upperArm(side, a.upperFill, "patch")}
+              </g>
             </g>
-            {trimmedDraw((clip) => <Svg markup={a.lowerFill} transform={el} clipPath={clip} />)}
-          </g>
+            <g clipPath={`url(#${clip}-low)`}>
+              {trimmedDraw((clip) => <Svg markup={a.lowerFill} transform={el} clipPath={clip} />)}
+            </g>
+          </>
         )}
         {folds.length > 0 && (
           <>
