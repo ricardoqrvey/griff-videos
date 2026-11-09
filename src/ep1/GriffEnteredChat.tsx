@@ -29,11 +29,10 @@ export const GriffEnteredChat: React.FC = () => {
           <Audio src={staticFile("audio/ep1/voice.mp3")} trimBefore={f(v.from)} trimAfter={f(v.to)} />
         </Sequence>
       ))}
-      {/* Keys: Griff from behind, the dev's message, Griff's line in the chat, Griff back at the laptop. */}
+      {/* Keys only when Griff types: from behind, his line in the chat, back at the laptop. */}
       {[
         [0, T.chatFrom, 0, 0.45],
-        [T.typeFrom, T.send, 0.6, 0.5],
-        [w("someone") - 0.05, w("dashboard") + 0.45, 1.6, 0.35],
+        [w("someone") - 0.05, w("dashboard") + 0.45, 1.6, 0.7],
         [T.chatEnd, T.headIn, 2.4, 0.4],
         [T.headOut + 0.2, T.end, 0.2, 0.4],
       ].map(([from, to, at, volume], i) => (
@@ -41,9 +40,12 @@ export const GriffEnteredChat: React.FC = () => {
           <Audio src={staticFile("audio/ep1/keyboard.mp3")} trimBefore={f(at)} volume={(fr) => volume * interpolate(fr, [0, 4, f(to - from) - 6, f(to - from)], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} loop />
         </Sequence>
       ))}
-      <Sequence from={f(T.notify)} durationInFrames={f(1)} layout="none">
-        <Audio src={staticFile("audio/ep1/notification.mp3")} volume={0.8} />
-      </Sequence>
+      {/* A ping with every message that lands in the chat. */}
+      {[T.jess, T.mike, T.send, T.notify, T.griff].map((at, i) => (
+        <Sequence key={`n${i}`} from={f(at)} durationInFrames={f(1)} layout="none">
+          <Audio src={staticFile("audio/ep1/notification.mp3")} volume={at === T.notify ? 0.85 : 0.6} />
+        </Sequence>
+      ))}
     </AbsoluteFill>
   );
 };
