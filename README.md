@@ -75,6 +75,17 @@ Labs and sheets: `ArmInwardLab` / `ArmInwardSheet` (the inward flex by angle, ar
 `ArmAcrossLab` / `ArmAcrossSheet` (earlier across-the-body tries). `GriffMix` is `GriffPresent`'s
 audio with inward gestures mixed in (hand to chest, forearm across, hand held in, arms crossed).
 
+## Ep. 1 "Griff Has Entered the Chat"
+
+`GriffEnteredChat` (9:16) uses the scene SVGs in `public/ep1/` (packed by `node scripts/ep1-svgs.mjs`),
+the voice, keys, ping and music in `public/audio/ep1/`, and `src/ep1/timing.ts` for every beat.
+Render, then normalize for social:
+
+```bash
+npx remotion render GriffEnteredChat out/griff_entered_chat.mp4
+ffmpeg -i out/griff_entered_chat.mp4 -c:v copy -af loudnorm=I=-14:TP=-1.5:LRA=11 -ar 48000 -c:a aac -b:a 192k out/tmp.mp4 && mv out/tmp.mp4 out/griff_entered_chat.mp4
+```
+
 ## Layout
 
 - `src/rig/Rig.tsx`: views, joints, elbow patch, hand swaps, turns.

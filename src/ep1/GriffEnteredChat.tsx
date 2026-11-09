@@ -40,6 +40,20 @@ export const GriffEnteredChat: React.FC = () => {
           <Audio src={staticFile("audio/ep1/keyboard.mp3")} trimBefore={f(at)} volume={(fr) => volume * interpolate(fr, [0, 4, f(to - from) - 6, f(to - from)], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} loop />
         </Sequence>
       ))}
+      {/* Music from just after "shortcut": under the closing line, up for the end card. */}
+      <Sequence from={f(MUSIC_FROM)} layout="none">
+        <Audio
+          src={staticFile("audio/ep1/music.mp3")}
+          volume={(fr) => {
+            const t = MUSIC_FROM + fr / FPS;
+            const k = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+            const under = interpolate(t, [MUSIC_FROM, MUSIC_FROM + 0.25, w("come") - 0.15, w("come") + 0.1], [0, 0.22, 0.22, 0.13], k);
+            const up = interpolate(t, [T.headOut - 0.2, T.endFrom + 0.3], [0, 0.17], k);
+            const out = interpolate(t, [T.end - 0.9, T.end], [1, 0], k);
+            return (under + up) * out;
+          }}
+        />
+      </Sequence>
       {/* A ping with every message that lands in the chat. */}
       {[T.jess, T.mike, T.send, T.notify, GRIFF_SEND].map((at, i) => (
         <Sequence key={`n${i}`} from={f(at)} durationInFrames={f(1)} layout="none">
@@ -51,6 +65,9 @@ export const GriffEnteredChat: React.FC = () => {
 };
 
 /** The last shot, blurred and dimmed under the end card. */
+/** The music comes in as "shortcut" ends (7.55 s into the take, where the voice goes silent). */
+const MUSIC_FROM = VOICE[2].at + (7.55 - VOICE[2].from);
+
 const ProfileBlur: React.FC<{ t: number }> = ({ t }) => {
   const k = interpolate(t, [T.endFrom, T.endFrom + 0.6], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.76, 0, 0.24, 1) });
   return (
