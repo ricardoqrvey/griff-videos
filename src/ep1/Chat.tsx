@@ -1,4 +1,4 @@
-import { Easing, interpolate, spring, staticFile, useCurrentFrame } from "remotion";
+import { Easing, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Rig, STAGE_H, STAGE_W } from "../rig/Rig";
 import { C, MONO, SANS } from "./brand";
 import { FPS, GRIFF_SEND, T, w } from "./timing";
@@ -77,6 +77,8 @@ const Message: React.FC<{
 export const Chat: React.FC = () => {
   const frame = useCurrentFrame();
   const t = frame / FPS;
+  const { width, height } = useVideoConfig();
+  const wide = width > height;
 
   // The window rises in, then leaves with a fast push toward the camera.
   const enter = spring({ frame: frame - Math.round(T.chatFrom * FPS), fps: FPS, config: { damping: 200 }, durationInFrames: 14 });
@@ -117,13 +119,11 @@ export const Chat: React.FC = () => {
       <div
         style={{
           position: "absolute",
-          left: 64,
-          top: 300,
-          width: 952,
-          height: 1300,
-          transform: `translateY(${(1 - enter) * 220}px) scale(${1 + leave * 0.5})`,
+          // 16:9: the same window, scaled down to fit the height.
+          ...(wide ? { left: 484, top: -110, width: 952, height: 1300 } : { left: 64, top: 300, width: 952, height: 1300 }),
+          transform: `translateY(${(1 - enter) * 220}px) scale(${(wide ? 0.8 : 1) * (1 + leave * 0.5)})`,
           opacity: enter * (1 - leave),
-          transformOrigin: "50% 70%",
+          transformOrigin: wide ? "50% 50%" : "50% 70%",
         }}
       >
         {/* Hard offset frame behind the window. */}

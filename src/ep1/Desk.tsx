@@ -1,23 +1,29 @@
-import { Easing, interpolate, useCurrentFrame } from "remotion";
+import { Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Rig, RigPose, STAGE_H, STAGE_W, View } from "../rig/Rig";
 import { Layer, SVG } from "./Layer";
 import { FPS, T, mouthAt, w } from "./timing";
 
 // The two desk shots, drawn from the episode's scene SVGs at their own
-// coordinates (scene units), seen through a 9:16 camera.
-const W = 1080, H = 1920;
+// coordinates (scene units), seen through a camera that fills the frame
+// (9:16 or 16:9; each format has its own framings).
 type Cam = { cx: number; cy: number; s: number };
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const io = Easing.bezier(0.76, 0, 0.24, 1);
 const mix = (a: Cam, b: Cam, k: number): Cam => ({ cx: a.cx + (b.cx - a.cx) * k, cy: a.cy + (b.cy - a.cy) * k, s: a.s + (b.s - a.s) * k });
 const ramp = (t: number, a: number, b: number) => interpolate(t, [a, b], [0, 1], { ...clamp, easing: io });
 
-const viewBox = (c: Cam) => `${c.cx - W / 2 / c.s} ${c.cy - H / 2 / c.s} ${W / c.s} ${H / c.s}`;
-const Svg: React.FC<{ cam: Cam; children: React.ReactNode }> = ({ cam, children }) => (
-  <svg viewBox={viewBox(cam)} width={W} height={H} style={{ position: "absolute", left: 0, top: 0 }} preserveAspectRatio="none">
-    {children}
-  </svg>
-);
+const useSize = () => {
+  const { width: W, height: H } = useVideoConfig();
+  return { W, H, wide: W > H };
+};
+const Svg: React.FC<{ cam: Cam; children: React.ReactNode }> = ({ cam, children }) => {
+  const { W, H } = useSize();
+  return (
+    <svg viewBox={`${cam.cx - W / 2 / cam.s} ${cam.cy - H / 2 / cam.s} ${W / cam.s} ${H / cam.s}`} width={W} height={H} style={{ position: "absolute", left: 0, top: 0 }} preserveAspectRatio="none">
+      {children}
+    </svg>
+  );
+};
 /** The room's radial gradient carried past the art's edges (the 9:16 frame is taller). */
 const Room: React.FC<{ name: string }> = ({ name }) => {
   const id = SVG[name].inner.match(/id="(paint0_radial_[^"]+)"/)![1];
@@ -44,7 +50,9 @@ const Markup: React.FC<{ html: string; transform?: string }> = ({ html, transfor
 export const BackShot: React.FC = () => {
   const frame = useCurrentFrame();
   const t = frame / FPS;
-  const cam: Cam = { cx: 690, cy: 384, s: 2.5 * (1 + ramp(t, 0, T.chatFrom) * 0.05) };
+  const { wide } = useSize();
+  const base: Cam = wide ? { cx: 690, cy: 384, s: 1.45 } : { cx: 690, cy: 384, s: 2.5 };
+  const cam: Cam = { ...base, s: base.s * (1 + ramp(t, 0, T.chatFrom) * 0.05) };
   // Unhurried typing: each upper arm rocks a degree or so at the shoulder, out of step.
   const rockL = Math.sin(t * 2 * Math.PI * 1.6) * 0.9 + Math.sin(t * 2 * Math.PI * 0.45) * 0.4;
   const rockR = Math.sin(t * 2 * Math.PI * 1.4 + 2) * 0.9 + Math.sin(t * 2 * Math.PI * 0.4 + 1) * 0.4;
@@ -69,10 +77,21 @@ export const BackShot: React.FC = () => {
 // ------------------------------------------------------------- profile shot
 // The rig's head, scaled and placed so its profile (view 270) sits on griff_90's neck.
 const RIG = { x: 531, y: -60, w: 775 };
-const TYPING: Cam = { cx: 770, cy: 288, s: 2.0 };
-const THREE_Q: Cam = { cx: 840, cy: 260, s: 2.25 };
-const FACE: Cam = { cx: 920, cy: 225, s: 3.3 };
-const FACE_EASED: Cam = { cx: 918, cy: 262, s: 2.75 };
+const CAMS = {
+  tall: {
+    TYPING: { cx: 770, cy: 288, s: 2.0 },
+    THREE_Q: { cx: 840, cy: 260, s: 2.25 },
+    FACE: { cx: 920, cy: 225, s: 3.3 },
+    FACE_EASED: { cx: 918, cy: 262, s: 2.75 },
+  },
+  wide: {
+    // The frame is short: keep headroom for the horns.
+    TYPING: { cx: 720, cy: 330, s: 1.35 },
+    THREE_Q: { cx: 860, cy: 240, s: 1.85 },
+    FACE: { cx: 912, cy: 195, s: 2.3 },
+    FACE_EASED: { cx: 905, cy: 225, s: 2.0 },
+  },
+} satisfies Record<string, Record<string, Cam>>;
 
 /** What draws Griff: the drawn profile body (griff_90, typing) under the
  *  rig's head — always the rig's head, griff_90's own is cut off at the top of
@@ -129,6 +148,8 @@ export const ProfileShot: React.FC = () => {
   const frame = useCurrentFrame();
   const t = frame / FPS;
   const look = lookAt(t);
+  const { W, H, wide } = useSize();
+  const { TYPING, THREE_Q, FACE, FACE_EASED } = CAMS[wide ? "wide" : "tall"];
 
   let cam = TYPING;
   cam = mix(cam, THREE_Q, ramp(t, T.headIn, T.headIn + 0.6) * (1 - ramp(t, T.headOut, T.headOut + 0.6)));

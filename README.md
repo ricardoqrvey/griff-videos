@@ -77,7 +77,7 @@ audio with inward gestures mixed in (hand to chest, forearm across, hand held in
 
 ## Ep. 1 "Griff Has Entered the Chat"
 
-`GriffEnteredChat` (9:16) uses the scene SVGs in `public/ep1/` (packed by `node scripts/ep1-svgs.mjs`),
+`GriffEnteredChat` (9:16) and `GriffEnteredChat169` (16:9, its own camera framings) use the scene SVGs in `public/ep1/` (packed by `node scripts/ep1-svgs.mjs`),
 the voice, keys, ping and music in `public/audio/ep1/`, and `src/ep1/timing.ts` for every beat.
 Render, then normalize for social:
 
