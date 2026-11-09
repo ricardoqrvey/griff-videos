@@ -11,9 +11,9 @@ export const f = (sec: number) => Math.round(sec * FPS);
 /** Voice clips: [from, to] in the take, played starting at `at` in the cut. */
 export const VOICE = [
   { from: 0, to: 2.2, at: 10.3 }, // "Someone say quick dashboard?" (typed in the chat)
-  { from: 2.2, to: 4.95, at: 14.15 }, // "I heard that from three sprints away." (3/4, seated)
-  { from: 4.95, to: 7.75, at: 17.5 }, // "Hey, I'm Griff. I might know a shortcut." (close-up)
-  { from: 7.75, to: 9.95, at: 21.0 }, // "Come see what we're building with GOAT."
+  { from: 2.2, to: 4.95, at: 14.55 }, // "I heard that from three sprints away." (3/4, seated)
+  { from: 4.95, to: 7.75, at: 17.9 }, // "Hey, I'm Griff. I might know a shortcut." (close-up)
+  { from: 7.75, to: 9.95, at: 21.4 }, // "Come see what we're building with GOAT."
 ];
 /** Time in the take for a time in the cut (undefined in the gaps). */
 export const takeTime = (t: number) => {
@@ -46,17 +46,19 @@ export const T = {
   typeFrom: 6.3,
   send: 7.5,
   notify: 9.0,
-  griff: 10.2, // Griff's bubble; he types the line as he says it
-  chatEnd: 13.4,
+  griffTypes: 10.2, // he types his line in the input as he says it, then sends
+  chatEnd: 13.8,
   // 3. Profile at the desk: he turns his head to the camera (3/4) and talks.
-  headIn: 14.0,
+  headIn: 14.4,
   // 4. Push in to his face, head to the front, brows at work.
-  zoomIn: [16.9, 17.5] as const,
+  zoomIn: [17.3, 17.9] as const,
   // 5. Back out to 3/4 on "Come see…", then back to the keys.
-  zoomOut: [21.15, 21.9] as const,
-  headOut: 23.1,
+  zoomOut: [21.55, 22.3] as const,
+  headOut: 23.5,
   // 6. Blur over the typing, logo and closing line on top.
-  endFrom: 23.6,
-  end: 27.6,
+  endFrom: 24.0,
+  end: 28.0,
 };
 export const EP1_FRAMES = f(T.end);
+/** Griff hits send on "Someone say quick dashboard?" just after saying it. */
+export const GRIFF_SEND = w("dashboard") + 0.55;

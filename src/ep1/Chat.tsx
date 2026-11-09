@@ -1,7 +1,7 @@
-import { Easing, interpolate, spring, useCurrentFrame } from "remotion";
+import { Easing, interpolate, spring, staticFile, useCurrentFrame } from "remotion";
 import { Rig, STAGE_H, STAGE_W } from "../rig/Rig";
 import { C, MONO, SANS } from "./brand";
-import { FPS, T, w } from "./timing";
+import { FPS, GRIFF_SEND, T, w } from "./timing";
 import { WORDMARK } from "./wordmark";
 
 // The developer chat, dressed as GOAT IQ: near-black canvas, flat surfaces,
@@ -12,6 +12,11 @@ const GRIFF_LINE = ["Someone", "say", "quick", "dashboard?"];
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const io = Easing.bezier(0.76, 0, 0.24, 1);
+
+/** A photo avatar: the image framed on the face (`pos` = background-position, `zoom` = background-size). */
+const Photo: React.FC<{ src: string; pos?: string; zoom?: string }> = ({ src, pos = "50% 50%", zoom = "cover" }) => (
+  <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${staticFile(src)})`, backgroundSize: zoom, backgroundPosition: pos }} />
+);
 
 const Tile: React.FC<{ bg: string; children?: React.ReactNode; size?: number }> = ({ bg, children, size = 92 }) => (
   <div
@@ -79,8 +84,8 @@ export const Chat: React.FC = () => {
   const jessIn = pop(T.jess), mikeIn = pop(T.mike);
   const leave = interpolate(t, [T.chatEnd - 0.3, T.chatEnd], [0, 1], { ...clamp, easing: Easing.in(Easing.cubic) });
 
-  // The developer types in the input, then sends.
-  const typed = Math.round(interpolate(t, [T.typeFrom, T.send - 0.12], [0, DEV_LINE.length], clamp));
+  // Mike is typing (the indicator), then his line lands.
+  const mikeTyping = t >= T.typeFrom && t < T.send;
   const sent = t >= T.send;
   const devIn = spring({ frame: frame - Math.round(T.send * FPS), fps: FPS, config: { damping: 18, stiffness: 220 } });
 
@@ -89,14 +94,12 @@ export const Chat: React.FC = () => {
   const notifyIn = spring({ frame: nf, fps: FPS, config: { damping: 13, stiffness: 260 } });
   const flash = interpolate(nf, [0, 2, 8], [0, 0.35, 0], clamp);
 
-  // Griff types his line as he says it.
-  const griffAt = T.griff;
-  const griffIn = pop(griffAt);
+  // Griff types his line in the input as he says it, then sends it.
   const line = GRIFF_LINE.join(" ");
-  const typeEnd = w("dashboard") + 0.45;
-  const griffTyped = Math.round(interpolate(t, [w("someone") - 0.05, typeEnd], [0, line.length], clamp));
-  const typing = griffTyped === 0;
-  const griffCaret = griffTyped > 0 && griffTyped < line.length;
+  const griffTyped = Math.round(interpolate(t, [w("someone") - 0.05, GRIFF_SEND - 0.12], [0, line.length], clamp));
+  const griffSent = t >= GRIFF_SEND;
+  const griffIn = pop(GRIFF_SEND);
+  const inputLive = griffTyped > 0 && !griffSent;
 
   const caret = Math.floor(t * 2.2) % 2 === 0;
 
@@ -139,18 +142,18 @@ export const Chat: React.FC = () => {
           {/* Log */}
           <div style={{ flex: 1, padding: "40px 40px 0", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 40, overflow: "hidden" }}>
             {t >= T.jess && (
-              <Message avatar={<Tile bg={C.cyan}>JS</Tile>} name="Jess" time="4:52 PM" style={{ transform: `translateY(${(1 - jessIn) * 60}px)`, opacity: jessIn }}>
+              <Message avatar={<Tile bg={C.cyan}><Photo src="ep1/avatars/jess.jpg" pos="53% 38%" zoom="175%" /></Tile>} name="Jess" time="4:52 PM" style={{ transform: `translateY(${(1 - jessIn) * 60}px)`, opacity: jessIn }}>
                 Sales wants customer analytics in the app. Who's taking it?
               </Message>
             )}
             {t >= T.mike && (
-              <Message avatar={<Tile bg={C.purple}>MK</Tile>} name="Mike" time="4:53 PM" style={{ transform: `translateY(${(1 - mikeIn) * 60}px)`, opacity: mikeIn }}>
+              <Message avatar={<Tile bg={C.purple}><Photo src="ep1/avatars/mike.png" /></Tile>} name="Mike" time="4:53 PM" style={{ transform: `translateY(${(1 - mikeIn) * 60}px)`, opacity: mikeIn }}>
                 I can pick it up this sprint.
               </Message>
             )}
             {sent && (
               <Message
-                avatar={<Tile bg={C.purple}>MK</Tile>}
+                avatar={<Tile bg={C.purple}><Photo src="ep1/avatars/mike.png" /></Tile>}
                 name="Mike"
                 time="4:53 PM"
                 style={{ transform: `translateY(${(1 - devIn) * 60}px)`, opacity: devIn }}
@@ -169,7 +172,7 @@ export const Chat: React.FC = () => {
               </div>
             )}
 
-            {t >= griffAt && (
+            {griffSent && (
               <Message
                 avatar={
                   <Tile bg={C.green}>
@@ -182,24 +185,18 @@ export const Chat: React.FC = () => {
                 time="4:54 PM"
                 style={{ transform: `translateY(${(1 - griffIn) * 60}px)`, opacity: griffIn }}
               >
-                {typing ? (
-                  <span style={{ color: C.muted, font: `400 30px ${MONO}` }}>typing…</span>
-                ) : (
-                  <>
-                    {line.slice(0, griffTyped)}
-                    {griffCaret && <span style={{ color: C.green, opacity: caret ? 1 : 0 }}>▍</span>}
-                  </>
-                )}
+                {line}
               </Message>
             )}
+            {mikeTyping && <span style={{ font: `400 28px ${MONO}`, color: C.muted, marginLeft: 118 }}>Mike is typing…</span>}
             <div style={{ height: 10 }} />
           </div>
 
           {/* Input */}
-          <div style={{ margin: 36, marginTop: 30, border: `2px solid ${typed > 0 && !sent ? C.green : C.line}`, background: C.bgDeep, padding: "26px 28px", display: "flex", alignItems: "center", gap: 18 }}>
-            <span style={{ font: `500 38px ${SANS}`, color: typed > 0 && !sent ? C.cream : C.muted, whiteSpace: "nowrap", overflow: "hidden" }}>
-              {!sent && typed > 0 ? DEV_LINE.slice(0, typed) : `Message #${CHANNEL}`}
-              {!sent && typed > 0 && <span style={{ color: C.green, opacity: caret ? 1 : 0 }}>▍</span>}
+          <div style={{ margin: 36, marginTop: 30, border: `2px solid ${inputLive ? C.green : C.line}`, background: C.bgDeep, padding: "26px 28px", display: "flex", alignItems: "center", gap: 18 }}>
+            <span style={{ font: `500 38px ${SANS}`, color: inputLive ? C.cream : C.muted, whiteSpace: "nowrap", overflow: "hidden" }}>
+              {inputLive ? line.slice(0, griffTyped) : `Message #${CHANNEL}`}
+              {inputLive && <span style={{ color: C.green, opacity: caret ? 1 : 0 }}>▍</span>}
             </span>
             <span style={{ marginLeft: "auto", background: C.green, color: C.greenInk, font: `800 26px ${SANS}`, padding: "12px 20px 10px", textTransform: "uppercase" }}>Send</span>
           </div>

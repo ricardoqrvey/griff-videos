@@ -72,6 +72,7 @@ const RIG = { x: 531, y: -60, w: 775 };
 const TYPING: Cam = { cx: 770, cy: 288, s: 2.0 };
 const THREE_Q: Cam = { cx: 840, cy: 260, s: 2.25 };
 const FACE: Cam = { cx: 920, cy: 225, s: 3.3 };
+const FACE_EASED: Cam = { cx: 918, cy: 262, s: 2.75 };
 
 /** What draws Griff: griff_90 itself (typing, face to the screen), griff_90's
  *  body under the rig's head (he turns his head to talk, still seated), or the
@@ -126,6 +127,9 @@ export const ProfileShot: React.FC = () => {
   let cam = TYPING;
   cam = mix(cam, THREE_Q, ramp(t, T.headIn, T.headIn + 0.6) * (1 - ramp(t, T.headOut, T.headOut + 0.6)));
   cam = mix(cam, FACE, ramp(t, T.zoomIn[0], T.zoomIn[1]) * (1 - ramp(t, T.zoomOut[0], T.zoomOut[1])));
+  // After "Hey, I'm Griff" the close-up eases back a little, for rhythm.
+  const ease = ramp(t, w("griff") + 0.45, w("griff") + 1.25) * (1 - ramp(t, T.zoomOut[0], T.zoomOut[1]));
+  cam = mix(cam, FACE_EASED, ease);
 
   // Typing while his face is to the screen, at an easy pace; the hand rests while he talks.
   const typing = look.mode === "typing";

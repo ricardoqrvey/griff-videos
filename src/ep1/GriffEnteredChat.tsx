@@ -3,7 +3,7 @@ import { loadBrandFonts } from "./brand";
 import { Chat } from "./Chat";
 import { BackShot, ProfileShot } from "./Desk";
 import { EndFrame } from "./EndFrame";
-import { FPS, T, VOICE, f, w } from "./timing";
+import { FPS, GRIFF_SEND, T, VOICE, f, w } from "./timing";
 
 // Griff Knows Something You Don't — Ep. 1 "Griff Has Entered the Chat".
 // 9:16: Griff from behind, typing; the dev chat, one message at a time; Griff
@@ -32,7 +32,7 @@ export const GriffEnteredChat: React.FC = () => {
       {/* Keys only when Griff types: from behind, his line in the chat, back at the laptop. */}
       {[
         [0, T.chatFrom, 0, 0.45],
-        [w("someone") - 0.05, w("dashboard") + 0.45, 1.6, 0.7],
+        [w("someone") - 0.05, GRIFF_SEND - 0.1, 1.6, 0.7],
         [T.chatEnd, T.headIn, 2.4, 0.4],
         [T.headOut + 0.2, T.end, 0.2, 0.4],
       ].map(([from, to, at, volume], i) => (
@@ -41,7 +41,7 @@ export const GriffEnteredChat: React.FC = () => {
         </Sequence>
       ))}
       {/* A ping with every message that lands in the chat. */}
-      {[T.jess, T.mike, T.send, T.notify, T.griff].map((at, i) => (
+      {[T.jess, T.mike, T.send, T.notify, GRIFF_SEND].map((at, i) => (
         <Sequence key={`n${i}`} from={f(at)} durationInFrames={f(1)} layout="none">
           <Audio src={staticFile("audio/ep1/notification.mp3")} volume={at === T.notify ? 0.85 : 0.6} />
         </Sequence>
