@@ -1,0 +1,21 @@
+<svg width="1375" height="768" viewBox="0 0 1375 768" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_498_7119)">
+<path d="M0 0H1375V768H1086.93H1085.33H1044.73H1029.45H1027.81H1003.65H972.893H971.114H959.855H957.82H449.795H448.289H436.462H434.887H404.133H365.208H363.696H347.755H306.013H0V0Z" fill="url(#paint0_radial_498_7119)"/>
+<line x1="156" x2="156" y2="698" stroke-width="2" stroke="black"/>
+<line x1="306" y1="699" x2="155" y2="699" stroke-width="2" stroke="black"/>
+<line x1="1375" y1="699" x2="1085" y2="699" stroke-width="2" stroke="black"/>
+<line x1="404" y1="699" x2="365" y2="699" stroke-width="2" stroke="black"/>
+<line x1="1028" y1="699" x2="1004" y2="699" stroke-width="2" stroke="black"/>
+<line x1="958" y1="699" x2="450" y2="699" stroke-width="2" stroke="black"/>
+<line x1="155.407" y1="698.913" x2="-1.59278" y2="768.913" stroke-width="2" stroke="black"/>
+</g>
+<defs>
+<radialGradient id="paint0_radial_498_7119" cx="0" cy="0" r="1" gradientTransform="matrix(0 628 -669.917 -0.813019 687.5 384)" gradientUnits="userSpaceOnUse">
+<stop stop-color="#276086"/>
+<stop offset="1" stop-color="#051D29"/>
+</radialGradient>
+<clipPath id="clip0_498_7119">
+<rect width="1375" height="768" fill="white"/>
+</clipPath>
+</defs>
+</svg>
