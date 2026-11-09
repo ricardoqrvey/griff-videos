@@ -74,19 +74,25 @@ const THREE_Q: Cam = { cx: 840, cy: 260, s: 2.25 };
 const FACE: Cam = { cx: 920, cy: 225, s: 3.3 };
 const FACE_EASED: Cam = { cx: 918, cy: 262, s: 2.75 };
 
-/** What draws Griff: griff_90 itself (typing, face to the screen), griff_90's
- *  body under the rig's head (he turns his head to talk, still seated), or the
- *  whole rig (the close-up, chest and face to the camera; the chair is behind him). */
-type Look = { mode: "typing" } | { mode: "head" | "full"; view: View };
+/** What draws Griff: the drawn profile body (griff_90, typing) under the
+ *  rig's head — always the rig's head, griff_90's own is cut off at the top of
+ *  its canvas — or the whole rig, turned to 3/4 or to the front, to talk. The
+ *  head leads the body by a couple of frames on the way in and out. */
+type Look = { mode: "drawn" | "full"; view: View };
 const lookAt = (t: number): Look => {
   const zi = (T.zoomIn[0] + T.zoomIn[1]) / 2, zo = T.zoomOut[0] + 0.25;
-  if (t < T.headIn || t >= T.headOut + 0.14) return { mode: "typing" };
-  if (t >= T.headOut || t < T.headIn + 0.07) return { mode: "head", view: "270" }; // a frame or two in profile either side of the turn
-  if (t >= zi - 0.1 && t < zi) return { mode: "full", view: "315" };
+  if (t < T.headIn || t >= T.headOut + 0.07) return { mode: "drawn", view: "270" };
+  if (t < T.headIn + 0.07 || t >= T.headOut) return { mode: "drawn", view: "315" };
   if (t >= zi && t < zo) return { mode: "full", view: "000" };
-  if (t >= zo && t < zo + 0.1) return { mode: "full", view: "315" };
-  return { mode: "head", view: "315" };
+  return { mode: "full", view: "315" };
 };
+
+// griff_90's two sleeve fills (upper arm, forearm), painted again over the
+// elbow so the forearm's outline doesn't cut across the upper arm.
+const G90 = SVG.griff_90.inner.split(/(?=<path)/);
+const sleeveD = (start: string) => G90.find((p) => p.includes(start))!.match(/ d="([^"]+)"/)![1];
+const UPPER_ARM = sleeveD("M390.414 365.289");
+const FOREARM = sleeveD("M299.736 490.581");
 
 type Brows = { l: number; r: number; tilt: number; nod: number };
 /** Brows (screen sides) and head per beat: the knowing look, then the brows at work in the close-up. */
@@ -131,14 +137,14 @@ export const ProfileShot: React.FC = () => {
   const ease = ramp(t, w("griff") + 0.45, w("griff") + 1.25) * (1 - ramp(t, T.zoomOut[0], T.zoomOut[1]));
   cam = mix(cam, FACE_EASED, ease);
 
-  // Typing while his face is to the screen, at an easy pace; the hand rests while he talks.
-  const typing = look.mode === "typing";
+  // Typing while his face is to the screen, at an easy pace.
+  const typing = look.mode === "drawn" && look.view === "270";
   const tap = typing ? Math.max(0, Math.sin(t * 2 * Math.PI * 2.2)) * 1.8 + Math.max(0, Math.sin(t * 2 * Math.PI * 1.3 + 1)) * 0.9 : 0;
 
   const b = browsAt(t);
   const pose: RigPose = {
     view: look.mode === "full" ? look.view : "270",
-    headView: look.mode === "typing" ? "270" : look.view,
+    headView: look.view,
     arms: {},
     head: { tilt: b.tilt + Math.sin(t * 0.8) * 0.6, nod: b.nod + Math.sin(t * 2.1) * 0.8 },
     face: { mouth: mouthAt(t), brows: { l: b.l, r: b.r }, browShape: { l: { arch: b.l > 8 ? 3 : 1 }, r: { arch: b.r > 8 ? 4 : 1 } } },
@@ -152,7 +158,7 @@ export const ProfileShot: React.FC = () => {
       <Svg cam={cam}>
         <Room name="back_90" />
         <Layer name="desktop_90" x={0} y={332} />
-        {/* griff_90 split three ways: the head (gone while the rig's head talks), the typing hand, the rest. */}
+        {/* griff_90 without its head (the rig's goes on top), the typing hand split off so it can tap. */}
         <clipPath id="ep1-body">
           <path d="M0 420 H250 L262 300 L455 240 H533 V900 H0 Z" />
         </clipPath>
@@ -163,23 +169,34 @@ export const ProfileShot: React.FC = () => {
           <rect x={0} y={540} width={190} height={100} />
         </clipPath>
         <g transform="translate(555 0)">
-          <g clipPath={typing ? undefined : "url(#ep1-body)"} opacity={look.mode === "full" ? 0 : 1}>
-            <g clipPath="url(#ep1-nohand)">
-              <Layer name="griff_90" />
+          {look.mode === "drawn" && (
+            <g clipPath="url(#ep1-body)">
+              <g clipPath="url(#ep1-nohand)">
+                <Layer name="griff_90" />
+              </g>
+              <g clipPath="url(#ep1-hand)" transform={`translate(0 ${-tap})`}>
+                <Layer name="griff_90" />
+              </g>
+              <clipPath id="ep1-elbow">
+                <rect x={250} y={430} width={220} height={240} />
+              </clipPath>
+              <g clipPath="url(#ep1-elbow)" fill="#CF2E9E">
+                <path d={UPPER_ARM} />
+                <path d={FOREARM} />
+              </g>
+              {/* One fold from the inside corner into the elbow, as on the rig. */}
+              <path d="M288 495 Q326 486 350 505" fill="none" stroke="#111" strokeWidth={3.6} strokeLinecap="round" />
             </g>
-            <g clipPath="url(#ep1-hand)" transform={`translate(0 ${-tap})`}>
-              <Layer name="griff_90" />
-            </g>
-          </g>
+          )}
         </g>
+        {/* Turned to talk, the chair is behind him. */}
+        {look.mode === "full" && look.view === "315" && <Layer name="chair_90" x={620} y={318} />}
       </Svg>
-      {!typing && (
-        <div style={{ position: "absolute", left: px(RIG.x), top: py(RIG.y), width: RIG.w * cam.s, height: ((RIG.w * STAGE_H) / STAGE_W) * cam.s }}>
-          <Rig pose={pose} id="ep1" only={look.mode === "head" ? ["head"] : undefined} />
-        </div>
-      )}
+      <div style={{ position: "absolute", left: px(RIG.x), top: py(RIG.y), width: RIG.w * cam.s, height: ((RIG.w * STAGE_H) / STAGE_W) * cam.s }}>
+        <Rig pose={pose} id="ep1" only={look.mode === "drawn" ? ["head"] : undefined} />
+      </div>
       <Svg cam={cam}>
-        {look.mode !== "full" && <Layer name="chair_90" x={620} y={318} />}
+        {look.mode === "drawn" && <Layer name="chair_90" x={620} y={318} />}
       </Svg>
     </div>
   );

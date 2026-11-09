@@ -47,7 +47,7 @@ export const GriffEnteredChat: React.FC = () => {
           volume={(fr) => {
             const t = MUSIC_FROM + fr / FPS;
             const k = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
-            const under = interpolate(t, [MUSIC_FROM, MUSIC_FROM + 0.25, w("come") - 0.15, w("come") + 0.1], [0, 0.22, 0.22, 0.13], k);
+            const under = interpolate(t, [w("come") - 0.15, w("come") + 0.1], [0.22, 0.13], k); // in at full level, no fade
             const up = interpolate(t, [T.headOut - 0.2, T.endFrom + 0.3], [0, 0.17], k);
             const out = interpolate(t, [T.end - 0.9, T.end], [1, 0], k);
             return (under + up) * out;

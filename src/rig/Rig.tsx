@@ -293,6 +293,9 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false
   return folds;
 }
 
+// How far (stage units) the glare keeps inside the lens shapes, which run under the frames.
+const LENS_INSET = 7;
+
 const HAND3D_TUCK = 24;
 // Measured on the front view: turn-03 reached 30 stage units past the
 // Turntable palm it follows.
@@ -753,8 +756,14 @@ export const Rig: React.FC<{ pose: RigPose; id?: string; only?: string[] }> = ({
                 {headSrc.pieces.glare && (
                   // The glare lags the head a little, as a reflection would.
                   <>
-                    <clipPath id={`${id}-lens`} dangerouslySetInnerHTML={{ __html: headSrc.pieces.lens }} />
-                    <g clipPath={`url(#${id}-lens)`}>
+                    {/* The lens shapes run under the frames: shrink them so the glare stays inside the rims. */}
+                    <filter id={`${id}-lens-in`} x="-10%" y="-10%" width="120%" height="120%">
+                      <feMorphology operator="erode" radius={LENS_INSET} />
+                    </filter>
+                    <mask id={`${id}-lens`} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
+                      <g filter={`url(#${id}-lens-in)`} fill="#fff" dangerouslySetInnerHTML={{ __html: white(headSrc.pieces.lens) }} />
+                    </mask>
+                    <g mask={`url(#${id}-lens)`}>
                       <Svg markup={headSrc.pieces.glare} transform={`translate(${-(head.tilt ?? 0) * 3.5} ${(head.nod ?? 0) * 1.2})`} />
                     </g>
                   </>
