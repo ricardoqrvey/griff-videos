@@ -69,10 +69,39 @@ const Message: React.FC<{
         )}
         <span style={{ font: `400 20px ${MONO}`, color: C.muted }}>{time}</span>
       </div>
-      <div style={{ font: `500 50px/1.22 ${SANS}`, color: C.cream, marginTop: 8 }}>{children}</div>
+      <div style={{ font: `500 var(--msg, 50px)/1.22 ${SANS}`, color: C.cream, marginTop: 8 }}>{children}</div>
     </div>
   </div>
 );
+
+/** Desktop only (16:9): channels and direct messages down the left. */
+const Sidebar: React.FC<{ t: number }> = ({ t }) => {
+  const item = (label: React.ReactNode, active = false, key?: string) => (
+    <div key={key} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 30px", font: `${active ? 800 : 500} 30px ${SANS}`, color: active ? C.cream : C.muted, background: active ? "#1f1f25" : undefined, borderLeft: `6px solid ${active ? C.green : "transparent"}` }}>
+      {label}
+    </div>
+  );
+  const head = (label: string) => (
+    <div style={{ padding: "30px 36px 12px", font: `700 18px ${MONO}`, letterSpacing: "0.08em", color: C.muted }}>{label}</div>
+  );
+  const dm = (name: string, avatar: React.ReactNode, online = true) => (
+    <>
+      <div style={{ width: 40, height: 40, position: "relative", overflow: "hidden", flex: "none" }}>{avatar}</div>
+      <span>{name}</span>
+      <span style={{ marginLeft: "auto", width: 12, height: 12, background: online ? C.green : C.line }} />
+    </>
+  );
+  return (
+    <div style={{ width: 380, flex: "none", background: C.bgDeep, borderRight: `2px solid ${C.line}` }}>
+      {head("CHANNELS")}
+      {["general", CHANNEL, "releases", "random"].map((c) => item(<><span style={{ color: C.green }}>#</span> {c}</>, c === CHANNEL, c))}
+      {head("DIRECT MESSAGES")}
+      {item(dm("Jess", <Photo src="ep1/avatars/jess.jpg" pos="53% 38%" zoom="175%" />), false, "jess")}
+      {item(dm("Mike", <Photo src="ep1/avatars/mike.png" />), false, "mike")}
+      {t >= T.notify && item(dm("Griff", <div style={{ position: "absolute", inset: 0, background: C.green }}><GriffHead size={40} /></div>), false, "griff")}
+    </div>
+  );
+};
 
 export const Chat: React.FC = () => {
   const frame = useCurrentFrame();
@@ -120,8 +149,8 @@ export const Chat: React.FC = () => {
         style={{
           position: "absolute",
           // 16:9: the same window, scaled down to fit the height.
-          ...(wide ? { left: 484, top: -110, width: 952, height: 1300 } : { left: 64, top: 300, width: 952, height: 1300 }),
-          transform: `translateY(${(1 - enter) * 220}px) scale(${(wide ? 0.8 : 1) * (1 + leave * 0.5)})`,
+          ...(wide ? { left: 60, top: 54, width: 1782, height: 954 } : { left: 64, top: 300, width: 952, height: 1300 }),
+          transform: `translateY(${(1 - enter) * 220}px) scale(${1 + leave * 0.5})`,
           opacity: enter * (1 - leave),
           transformOrigin: wide ? "50% 50%" : "50% 70%",
         }}
@@ -139,8 +168,11 @@ export const Chat: React.FC = () => {
             <span style={{ marginLeft: "auto", font: `700 20px ${MONO}`, color: C.muted, letterSpacing: "0.08em" }}>{t >= T.notify ? "4" : "3"} ONLINE</span>
           </div>
 
+          <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+          {wide && <Sidebar t={t} />}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           {/* Log */}
-          <div style={{ flex: 1, padding: "40px 40px 0", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 40, overflow: "hidden" }}>
+          <div style={{ flex: 1, padding: wide ? "24px 40px 0" : "40px 40px 0", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: wide ? 20 : 40, overflow: "hidden", ...(wide ? { "--msg": "42px" } : {}) } as React.CSSProperties}>
             {t >= T.jess && (
               <Message avatar={<Tile bg={C.cyan}><Photo src="ep1/avatars/jess.jpg" pos="53% 38%" zoom="175%" /></Tile>} name="Jess" time="4:52 PM" style={{ transform: `translateY(${(1 - jessIn) * 60}px)`, opacity: jessIn }}>
                 Sales wants customer analytics in the app. Who's taking it?
@@ -199,6 +231,8 @@ export const Chat: React.FC = () => {
               {inputLive && <span style={{ color: C.green, opacity: caret ? 1 : 0 }}>▍</span>}
             </span>
             <span style={{ marginLeft: "auto", background: C.green, color: C.greenInk, font: `800 26px ${SANS}`, padding: "12px 20px 10px", textTransform: "uppercase" }}>Send</span>
+          </div>
+          </div>
           </div>
         </div>
       </div>

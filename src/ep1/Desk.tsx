@@ -24,6 +24,21 @@ const Svg: React.FC<{ cam: Cam; children: React.ReactNode }> = ({ cam, children 
     </svg>
   );
 };
+const far = (x: number, y: number, dx: number, dy: number) => [x, y, x + dx * 40, y + dy * 40];
+const WALLS: Record<string, number[][]> = {
+  back_90: [
+    [154, 0, 154, -3000],
+    [1261, 0, 1261, -3000],
+    far(153.4, 584.9, -157, 70),
+    far(1259.6, 584.9, 157, 70),
+  ],
+  back_0: [
+    [156, 0, 156, -3000],
+    far(155.4, 698.9, -157, 70),
+    [1375, 699, 4000, 699],
+  ],
+};
+
 /** The room's radial gradient carried past the art's edges (the 9:16 frame is taller). */
 const Room: React.FC<{ name: string }> = ({ name }) => {
   const id = SVG[name].inner.match(/id="(paint0_radial_[^"]+)"/)![1];
@@ -31,6 +46,12 @@ const Room: React.FC<{ name: string }> = ({ name }) => {
     <>
       <rect x={-1500} y={-1500} width={4400} height={3800} fill={`url(#${id})`} />
       <Layer name={name} />
+      {/* The room's corner lines run on past the art, to the frame's edges. */}
+      <g stroke="black" strokeWidth={2}>
+        {WALLS[name]?.map(([x1, y1, x2, y2], i) => (
+          <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} />
+        ))}
+      </g>
     </>
   );
 };
