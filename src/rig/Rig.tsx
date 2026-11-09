@@ -416,7 +416,8 @@ function Hand3d({ a, p, flip, id, over }: { a: ArmData; p: Hand3dPose; flip: num
   return <g transform={`translate(${joint[0]} ${joint[1]}) rotate(${rot})`} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig" }) => {
+/** `only` limits the drawing to some pieces (e.g. ["head"] to seat the rig's head on a drawn body). */
+export const Rig: React.FC<{ pose: RigPose; id?: string; only?: string[] }> = ({ pose, id = "rig", only }) => {
   const { src, mirror } = SOURCE[pose.view];
   const view = RIG.views[src];
   const vt = viewTransform(pose.view);
@@ -741,6 +742,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string }> = ({ pose, id = "rig"
         .flatMap((name) => (name.startsWith("arm-") ? [`hand-${name.slice(4)}`, name] : [name]))
         // Forearms swung in across the body come over the torso.
         .flatMap((name) => (name === "torso" ? [name, ...Object.keys(view.arms).map((side) => `across-${side}`)] : [name]))
+        .filter((name) => !only || only.includes(name))
         .map((name) => {
         if (name === "head") {
           const hn = headSrc.neck;

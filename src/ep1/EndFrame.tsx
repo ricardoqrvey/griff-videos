@@ -3,7 +3,7 @@ import { C, MONO, SANS } from "./brand";
 import { FPS, T } from "./timing";
 import { WORDMARK } from "./wordmark";
 
-// End frame: the GOAT IQ wordmark builds as in the product tour's finale (the
+// End card over the blurred last shot: the GOAT IQ wordmark builds as in the product tour's finale (the
 // green horn mark spins in, GOAT wipes on, IQ pops), then the tagline and URL.
 const io = Easing.bezier(0.76, 0, 0.24, 1);
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -21,7 +21,7 @@ export const EndFrame: React.FC = () => {
     .ep1-wm .wm-iq { transform-box: fill-box; transform-origin: 0% 100%; opacity: ${iq}; transform: translateY(${(1 - iq) * 40}%) scale(${0.7 + iq * 0.3}); }
   `;
   return (
-    <div style={{ position: "absolute", inset: 0, background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: SANS }}>
+    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: SANS }}>
       <style>{css}</style>
       <div className="ep1-wm" style={{ width: 760 }} dangerouslySetInnerHTML={{ __html: WORDMARK }} />
       <div style={{ marginTop: 70, textAlign: "center", font: `800 58px/1.0 ${SANS}`, textTransform: "uppercase", letterSpacing: "-0.01em", color: C.cream }}>

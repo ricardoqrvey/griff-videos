@@ -74,7 +74,9 @@ export const Chat: React.FC = () => {
   const t = frame / FPS;
 
   // The window rises in, then leaves with a fast push toward the camera.
-  const enter = spring({ frame, fps: FPS, config: { damping: 200 }, durationInFrames: 14 });
+  const enter = spring({ frame: frame - Math.round(T.chatFrom * FPS), fps: FPS, config: { damping: 200 }, durationInFrames: 14 });
+  const pop = (at: number) => spring({ frame: frame - Math.round(at * FPS), fps: FPS, config: { damping: 18, stiffness: 220 } });
+  const jessIn = pop(T.jess), mikeIn = pop(T.mike);
   const leave = interpolate(t, [T.chatEnd - 0.3, T.chatEnd], [0, 1], { ...clamp, easing: Easing.in(Easing.cubic) });
 
   // The developer types in the input, then sends.
@@ -87,11 +89,14 @@ export const Chat: React.FC = () => {
   const notifyIn = spring({ frame: nf, fps: FPS, config: { damping: 13, stiffness: 260 } });
   const flash = interpolate(nf, [0, 2, 8], [0, 0.35, 0], clamp);
 
-  // Griff's message, word by word with the voice.
-  const griffAt = w("someone") - 0.25;
-  const griffIn = spring({ frame: frame - Math.round(griffAt * FPS), fps: FPS, config: { damping: 18, stiffness: 220 } });
-  const shown = GRIFF_LINE.map((_, i) => t >= w(["someone", "say", "quick", "dashboard"][i]));
-  const typing = t >= griffAt && !shown[0];
+  // Griff types his line as he says it.
+  const griffAt = T.griff;
+  const griffIn = pop(griffAt);
+  const line = GRIFF_LINE.join(" ");
+  const typeEnd = w("dashboard") + 0.45;
+  const griffTyped = Math.round(interpolate(t, [w("someone") - 0.05, typeEnd], [0, line.length], clamp));
+  const typing = griffTyped === 0;
+  const griffCaret = griffTyped > 0 && griffTyped < line.length;
 
   const caret = Math.floor(t * 2.2) % 2 === 0;
 
@@ -133,12 +138,16 @@ export const Chat: React.FC = () => {
 
           {/* Log */}
           <div style={{ flex: 1, padding: "40px 40px 0", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 40, overflow: "hidden" }}>
-            <Message avatar={<Tile bg={C.cyan}>JS</Tile>} name="Jess" time="4:52 PM" style={{ opacity: 0.55 }}>
-              Sales wants customer analytics in the app. Who's taking it?
-            </Message>
-            <Message avatar={<Tile bg={C.purple}>MK</Tile>} name="Mike" time="4:53 PM" style={{ opacity: 0.55 }}>
-              I can pick it up this sprint.
-            </Message>
+            {t >= T.jess && (
+              <Message avatar={<Tile bg={C.cyan}>JS</Tile>} name="Jess" time="4:52 PM" style={{ transform: `translateY(${(1 - jessIn) * 60}px)`, opacity: jessIn }}>
+                Sales wants customer analytics in the app. Who's taking it?
+              </Message>
+            )}
+            {t >= T.mike && (
+              <Message avatar={<Tile bg={C.purple}>MK</Tile>} name="Mike" time="4:53 PM" style={{ transform: `translateY(${(1 - mikeIn) * 60}px)`, opacity: mikeIn }}>
+                I can pick it up this sprint.
+              </Message>
+            )}
             {sent && (
               <Message
                 avatar={<Tile bg={C.purple}>MK</Tile>}
@@ -176,11 +185,10 @@ export const Chat: React.FC = () => {
                 {typing ? (
                   <span style={{ color: C.muted, font: `400 30px ${MONO}` }}>typing…</span>
                 ) : (
-                  GRIFF_LINE.map((word, i) => (
-                    <span key={i} style={{ opacity: shown[i] ? 1 : 0 }}>
-                      {word}{" "}
-                    </span>
-                  ))
+                  <>
+                    {line.slice(0, griffTyped)}
+                    {griffCaret && <span style={{ color: C.green, opacity: caret ? 1 : 0 }}>▍</span>}
+                  </>
                 )}
               </Message>
             )}
