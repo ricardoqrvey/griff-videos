@@ -1,132 +1,132 @@
 [
-{
-"text": "Someone",
-"start": 0.15,
-"end": 0.68
-},
-{
-"text": "say,",
-"start": 0.68,
-"end": 1.14
-},
-{
-"text": "Quick",
-"start": 1.14,
-"end": 1.71
-},
-{
-"text": "Dashboard?",
-"start": 1.71,
-"end": 3.0
-},
-{
-"text": "I",
-"start": 3.0,
-"end": 3.12
-},
-{
-"text": "heard",
-"start": 3.12,
-"end": 3.39
-},
-{
-"text": "that",
-"start": 3.39,
-"end": 3.66
-},
-{
-"text": "from",
-"start": 3.66,
-"end": 3.93
-},
-{
-"text": "three",
-"start": 3.93,
-"end": 4.26
-},
-{
-"text": "sprints",
-"start": 4.26,
-"end": 4.82
-},
-{
-"text": "away.",
-"start": 4.82,
-"end": 5.24
-},
-{
-"text": "Hey,",
-"start": 5.24,
-"end": 5.65
-},
-{
-"text": "I'm",
-"start": 5.65,
-"end": 5.89
-},
-{
-"text": "Griff.",
-"start": 5.89,
-"end": 6.6
-},
-{
-"text": "I",
-"start": 6.6,
-"end": 6.72
-},
-{
-"text": "might",
-"start": 6.72,
-"end": 6.97
-},
-{
-"text": "know",
-"start": 6.97,
-"end": 7.22
-},
-{
-"text": "a",
-"start": 7.22,
-"end": 7.27
-},
-{
-"text": "shortcut.",
-"start": 7.27,
-"end": 8.0
-},
-{
-"text": "Come",
-"start": 8.0,
-"end": 8.22
-},
-{
-"text": "see",
-"start": 8.22,
-"end": 8.39
-},
-{
-"text": "what",
-"start": 8.39,
-"end": 8.61
-},
-{
-"text": "we're",
-"start": 8.61,
-"end": 8.89
-},
-{
-"text": "building",
-"start": 8.89,
-"end": 9.38
-},
-{
-"text": "with",
-"start": 9.38,
-"end": 9.56
-},
-{
-"text": "Goat.",
-"start": 9.56,
-"end": 10.0
-}
+ {
+  "text": "Someone",
+  "start": 0.15,
+  "end": 0.68
+ },
+ {
+  "text": "say,",
+  "start": 0.68,
+  "end": 1.14
+ },
+ {
+  "text": "Quick",
+  "start": 1.14,
+  "end": 1.71
+ },
+ {
+  "text": "Dashboard?",
+  "start": 1.71,
+  "end": 3.0
+ },
+ {
+  "text": "I",
+  "start": 3.0,
+  "end": 3.12
+ },
+ {
+  "text": "heard",
+  "start": 3.12,
+  "end": 3.39
+ },
+ {
+  "text": "that",
+  "start": 3.39,
+  "end": 3.66
+ },
+ {
+  "text": "from",
+  "start": 3.66,
+  "end": 3.93
+ },
+ {
+  "text": "three",
+  "start": 3.93,
+  "end": 4.26
+ },
+ {
+  "text": "sprints",
+  "start": 4.26,
+  "end": 4.82
+ },
+ {
+  "text": "away.",
+  "start": 4.82,
+  "end": 5.24
+ },
+ {
+  "text": "Hey,",
+  "start": 5.13,
+  "end": 5.43
+ },
+ {
+  "text": "I'm",
+  "start": 5.7,
+  "end": 5.9
+ },
+ {
+  "text": "Griff.",
+  "start": 5.9,
+  "end": 6.4
+ },
+ {
+  "text": "I",
+  "start": 6.65,
+  "end": 6.77
+ },
+ {
+  "text": "might",
+  "start": 6.77,
+  "end": 7.02
+ },
+ {
+  "text": "know",
+  "start": 7.02,
+  "end": 7.27
+ },
+ {
+  "text": "a",
+  "start": 7.27,
+  "end": 7.32
+ },
+ {
+  "text": "shortcut.",
+  "start": 7.32,
+  "end": 8.05
+ },
+ {
+  "text": "Come",
+  "start": 8.05,
+  "end": 8.27
+ },
+ {
+  "text": "see",
+  "start": 8.27,
+  "end": 8.44
+ },
+ {
+  "text": "what",
+  "start": 8.44,
+  "end": 8.66
+ },
+ {
+  "text": "we're",
+  "start": 8.66,
+  "end": 8.94
+ },
+ {
+  "text": "building",
+  "start": 8.94,
+  "end": 9.43
+ },
+ {
+  "text": "with",
+  "start": 9.43,
+  "end": 9.61
+ },
+ {
+  "text": "Goat.",
+  "start": 9.61,
+  "end": 10.05
+ }
 ]

@@ -16,7 +16,7 @@ export const GriffEnteredChat: React.FC = () => {
   const t = frame / FPS;
   return (
     <AbsoluteFill style={{ background: "#101011" }}>
-      {t < T.chatFrom ? <BackShot /> : t < T.chatEnd ? <Chat /> : <ProfileShot />}
+      <Shots />
       {t >= T.endFrom && (
         <>
           <ProfileBlur t={t} />
@@ -55,7 +55,7 @@ export const GriffEnteredChat: React.FC = () => {
         />
       </Sequence>
       {/* A ping with every message that lands in the chat. */}
-      {[T.jess, T.mike, T.send, T.notify, GRIFF_SEND].map((at, i) => (
+      {[T.jess, T.send, T.notify, GRIFF_SEND].map((at, i) => (
         <Sequence key={`n${i}`} from={f(at)} durationInFrames={f(1)} layout="none">
           <Audio src={staticFile("audio/ep1/notification.mp3")} volume={at === T.notify ? 0.85 : 0.6} />
         </Sequence>
@@ -64,9 +64,14 @@ export const GriffEnteredChat: React.FC = () => {
   );
 };
 
+const Shots: React.FC = () => {
+  const t = useCurrentFrame() / FPS;
+  return <AbsoluteFill>{t < T.chatFrom ? <BackShot /> : t < T.chatEnd ? <Chat /> : <ProfileShot />}</AbsoluteFill>;
+};
+
 /** The last shot, blurred and dimmed under the end card. */
-/** The music comes in as "shortcut" ends (7.55 s into the take, where the voice goes silent). */
-const MUSIC_FROM = VOICE[2].at + (7.55 - VOICE[2].from);
+/** The music comes in as "shortcut" ends (7.6 s into the take, where the voice goes silent). */
+const MUSIC_FROM = VOICE[2].at + (7.6 - VOICE[2].from);
 
 const ProfileBlur: React.FC<{ t: number }> = ({ t }) => {
   const k = interpolate(t, [T.endFrom, T.endFrom + 0.6], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.76, 0, 0.24, 1) });

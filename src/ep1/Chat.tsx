@@ -2,12 +2,25 @@ import { Easing, interpolate, spring, staticFile, useCurrentFrame, useVideoConfi
 import { Rig, STAGE_H, STAGE_W } from "../rig/Rig";
 import { C, MONO, SANS } from "./brand";
 import { FPS, GRIFF_SEND, T, w } from "./timing";
+import { BLUR, PUSH, enterK, exitK } from "./transitions";
 import { WORDMARK } from "./wordmark";
 
 // The developer chat, dressed as GOAT IQ: near-black canvas, flat surfaces,
 // square corners, hard offset shadows, Archivo with Space Mono for metadata.
 const CHANNEL = "dashboard-squad";
-const DEV_LINE = "Should be a quick dashboard project.";
+const JESS_LINE = "Our new customer wants some sales reports.";
+const DEV_LINE = "Got it. Should be a quick dashboard.";
+
+/** The team's own (made-up) company, top left: a ring with an orbiting dot and a lowercase wordmark. */
+const CompanyLogo: React.FC = () => (
+  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+    <svg width="44" height="44" viewBox="0 0 44 44">
+      <circle cx="22" cy="22" r="14" fill="none" stroke="#ff7a59" strokeWidth="7" />
+      <circle cx="35" cy="9" r="6" fill={C.cream} />
+    </svg>
+    <span style={{ font: `800 36px/1 ${SANS}`, color: C.cream, letterSpacing: "-0.03em" }}>brightloop</span>
+  </div>
+);
 const GRIFF_LINE = ["Someone", "say", "quick", "dashboard?"];
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -109,11 +122,10 @@ export const Chat: React.FC = () => {
   const { width, height } = useVideoConfig();
   const wide = width > height;
 
-  // The window rises in, then leaves with a fast push toward the camera.
-  const enter = spring({ frame: frame - Math.round(T.chatFrom * FPS), fps: FPS, config: { damping: 200 }, durationInFrames: 14 });
+  // Zoom-through in and out: the cut lands pushed in and settles; it leaves pushing on.
+  const enter = enterK(t, T.chatFrom), leave = exitK(t, T.chatEnd);
   const pop = (at: number) => spring({ frame: frame - Math.round(at * FPS), fps: FPS, config: { damping: 18, stiffness: 220 } });
-  const jessIn = pop(T.jess), mikeIn = pop(T.mike);
-  const leave = interpolate(t, [T.chatEnd - 0.3, T.chatEnd], [0, 1], { ...clamp, easing: Easing.in(Easing.cubic) });
+  const jessIn = pop(T.jess);
 
   // Mike is typing (the indicator), then his line lands.
   const mikeTyping = t >= T.typeFrom && t < T.send;
@@ -136,6 +148,7 @@ export const Chat: React.FC = () => {
 
   return (
     <div style={{ position: "absolute", inset: 0, background: C.bg, fontFamily: SANS, overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: 0, transform: `scale(${1 + (enter + leave) * PUSH})`, transformOrigin: wide ? "60% 55%" : "50% 62%", filter: enter + leave > 0 ? `blur(${(enter + leave) * BLUR}px)` : undefined }}>
       {/* Grid crosses, as on the GOAT IQ stage. */}
       <div
         style={{
@@ -150,9 +163,6 @@ export const Chat: React.FC = () => {
           position: "absolute",
           // 16:9: the same window, scaled down to fit the height.
           ...(wide ? { left: 60, top: 54, width: 1782, height: 954 } : { left: 64, top: 300, width: 952, height: 1300 }),
-          transform: `translateY(${(1 - enter) * 220}px) scale(${1 + leave * 0.5})`,
-          opacity: enter * (1 - leave),
-          transformOrigin: wide ? "50% 50%" : "50% 70%",
         }}
       >
         {/* Hard offset frame behind the window. */}
@@ -160,7 +170,7 @@ export const Chat: React.FC = () => {
         <div style={{ position: "absolute", inset: 0, background: C.surface, border: `2px solid ${C.line}`, display: "flex", flexDirection: "column" }}>
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", gap: 22, padding: "30px 36px", borderBottom: `2px solid ${C.line}`, background: C.bgDeep }}>
-            <div style={{ width: 150, height: 32 }} dangerouslySetInnerHTML={{ __html: WORDMARK.replace('class="wm"', 'class="wm" width="150" height="32"') }} />
+            <CompanyLogo />
             <div style={{ width: 2, height: 40, background: C.line }} />
             <span style={{ font: `800 38px ${SANS}`, color: C.cream }}>
               <span style={{ color: C.green }}>#</span> {CHANNEL}
@@ -175,12 +185,7 @@ export const Chat: React.FC = () => {
           <div style={{ flex: 1, padding: wide ? "24px 40px 0" : "40px 40px 0", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: wide ? 20 : 40, overflow: "hidden", ...(wide ? { "--msg": "42px" } : {}) } as React.CSSProperties}>
             {t >= T.jess && (
               <Message avatar={<Tile bg={C.cyan}><Photo src="ep1/avatars/jess.jpg" pos="53% 38%" zoom="175%" /></Tile>} name="Jess" time="4:52 PM" style={{ transform: `translateY(${(1 - jessIn) * 60}px)`, opacity: jessIn }}>
-                Sales wants customer analytics in the app. Who's taking it?
-              </Message>
-            )}
-            {t >= T.mike && (
-              <Message avatar={<Tile bg={C.purple}><Photo src="ep1/avatars/mike.png" /></Tile>} name="Mike" time="4:53 PM" style={{ transform: `translateY(${(1 - mikeIn) * 60}px)`, opacity: mikeIn }}>
-                I can pick it up this sprint.
+                {JESS_LINE}
               </Message>
             )}
             {sent && (
@@ -235,6 +240,7 @@ export const Chat: React.FC = () => {
           </div>
           </div>
         </div>
+      </div>
       </div>
       <div style={{ position: "absolute", inset: 0, background: C.green, opacity: flash, mixBlendMode: "screen" }} />
     </div>

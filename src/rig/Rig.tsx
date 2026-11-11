@@ -295,6 +295,22 @@ function elbowFolds(a: ArmData, bend: number, deg = Math.abs(bend), long = false
 
 // How far (stage units) the glare keeps inside the lens shapes, which run under the frames.
 const LENS_INSET = 7;
+// The glasses' frame fills, per view: cut out of the glare's mask (grown a
+// little, to cover their outline) since the lens shapes run on under them.
+const FRAME_FILLS = ["#68adb8", "#68acb9", "#2bc4d4", "#5fb3c6"];
+const FRAME_OUTLINE = 9;
+const SHAPES = /<(path|polygon|rect|ellipse|circle)\b[^>]*>(?:<\/\1>)?/g;
+const geometry = (el: string) => el.match(/\s(?:d|points)="([^"]+)"/)?.[1] ?? el;
+/** The glare's mask, per head: the lenses (shrunk), less the frame (grown, for its
+ *  outline), plus the lenses painted over the frame (the near one, in 3/4). */
+const lensMask = (head: string, lens: string) => {
+  const frame = (head.match(SHAPES) ?? []).filter((el) => FRAME_FILLS.some((c) => el.toLowerCase().includes(`fill="${c}"`)));
+  const lastFrame = Math.max(-1, ...frame.map((el) => head.indexOf(el)));
+  const lenses = lens.match(SHAPES) ?? [];
+  const over = lenses.filter((el) => head.indexOf(geometry(el)) > lastFrame);
+  const paint = (els: string[], fill: string) => els.map((el) => el.replace(/fill="#[0-9a-fA-F]{3,6}"/, `fill="${fill}"`)).join("");
+  return { under: paint(lenses, "#fff"), frame: paint(frame, "#000"), over: paint(over, "#fff") };
+};
 
 const HAND3D_TUCK = 24;
 // Measured on the front view: turn-03 reached 30 stage units past the
@@ -749,6 +765,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string; only?: string[] }> = ({
         .map((name) => {
         if (name === "head") {
           const hn = headSrc.neck;
+          const mask = lensMask(headSrc.pieces.head, headSrc.pieces.lens ?? "");
           return (
             <g key={name} transform={`${viewTransform(headView)} ${bodyT}`}>
               <g transform={`translate(0 ${head.nod ?? 0}) rotate(${head.tilt ?? 0} ${hn[0]} ${hn[1]})`}>
@@ -761,7 +778,9 @@ export const Rig: React.FC<{ pose: RigPose; id?: string; only?: string[] }> = ({
                       <feMorphology operator="erode" radius={LENS_INSET} />
                     </filter>
                     <mask id={`${id}-lens`} maskUnits="userSpaceOnUse" x={-2000} y={-2000} width={6000} height={6000}>
-                      <g filter={`url(#${id}-lens-in)`} fill="#fff" dangerouslySetInnerHTML={{ __html: white(headSrc.pieces.lens) }} />
+                      <g filter={`url(#${id}-lens-in)`} fill="#fff" dangerouslySetInnerHTML={{ __html: mask.under }} />
+                      <g fill="#000" stroke="#000" strokeWidth={FRAME_OUTLINE * 2} strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: mask.frame }} />
+                      <g filter={`url(#${id}-lens-in)`} fill="#fff" dangerouslySetInnerHTML={{ __html: mask.over }} />
                     </mask>
                     <g mask={`url(#${id}-lens)`}>
                       <Svg markup={headSrc.pieces.glare} transform={`translate(${-(head.tilt ?? 0) * 3.5} ${(head.nod ?? 0) * 1.2})`} />

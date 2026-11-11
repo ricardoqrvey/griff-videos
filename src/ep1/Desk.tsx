@@ -2,6 +2,7 @@ import { Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Rig, RigPose, STAGE_H, STAGE_W, View } from "../rig/Rig";
 import { Layer, SVG } from "./Layer";
 import { FPS, T, mouthAt, w } from "./timing";
+import { BLUR, PUSH, camEase, enterK, exitK } from "./transitions";
 
 // The two desk shots, drawn from the episode's scene SVGs at their own
 // coordinates (scene units), seen through a camera that fills the frame
@@ -10,7 +11,7 @@ type Cam = { cx: number; cy: number; s: number };
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const io = Easing.bezier(0.76, 0, 0.24, 1);
 const mix = (a: Cam, b: Cam, k: number): Cam => ({ cx: a.cx + (b.cx - a.cx) * k, cy: a.cy + (b.cy - a.cy) * k, s: a.s + (b.s - a.s) * k });
-const ramp = (t: number, a: number, b: number) => interpolate(t, [a, b], [0, 1], { ...clamp, easing: io });
+const ramp = (t: number, a: number, b: number) => interpolate(t, [a, b], [0, 1], { ...clamp, easing: camEase });
 
 const useSize = () => {
   const { width: W, height: H } = useVideoConfig();
@@ -73,13 +74,15 @@ export const BackShot: React.FC = () => {
   const t = frame / FPS;
   const { wide } = useSize();
   const base: Cam = wide ? { cx: 690, cy: 384, s: 1.45 } : { cx: 690, cy: 384, s: 2.5 };
-  const cam: Cam = { ...base, s: base.s * (1 + ramp(t, 0, T.chatFrom) * 0.05) };
+  // A slow drift in, then the push through to the chat.
+  const out = exitK(t, T.chatFrom);
+  const cam: Cam = { ...base, s: base.s * (1 + (t / T.chatFrom) * 0.05) * (1 + out * PUSH) };
   // Unhurried typing: each upper arm rocks a degree or so at the shoulder, out of step.
   const rockL = Math.sin(t * 2 * Math.PI * 1.6) * 0.9 + Math.sin(t * 2 * Math.PI * 0.45) * 0.4;
   const rockR = Math.sin(t * 2 * Math.PI * 1.4 + 2) * 0.9 + Math.sin(t * 2 * Math.PI * 0.4 + 1) * 0.4;
   const X = 481, Y = 105;
   return (
-    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", filter: out > 0 ? `blur(${out * BLUR}px)` : undefined }}>
       <Svg cam={cam}>
         <Room name="back_0" />
         <Layer name="desktop_0" x={277} y={287} />
@@ -118,13 +121,47 @@ const CAMS = {
  *  rig's head — always the rig's head, griff_90's own is cut off at the top of
  *  its canvas — or the whole rig, turned to 3/4 or to the front, to talk. The
  *  head leads the body by a couple of frames on the way in and out. */
-type Look = { mode: "drawn" | "full"; view: View };
+type Look = { mode: "drawn" | "full" | "tween"; view: View };
+/** The 3/4 ↔ profile in-between (griff_070, mirrored like the rig's 315), held a few frames. */
+const TWEEN = 0.1;
+export const TWEEN_AX = 452; // its torso's centre on its canvas, as the rig's anchorX
+/** The view swaps, each placed mid camera move so the move carries it. */
+const ZI = (T.zoomIn[0] + T.zoomIn[1]) / 2;
+const ZO = (T.zoomOut[0] + T.zoomOut[1]) / 2;
 const lookAt = (t: number): Look => {
-  const zi = (T.zoomIn[0] + T.zoomIn[1]) / 2, zo = T.zoomOut[0] + 0.25;
-  if (t < T.headIn || t >= T.headOut + 0.07) return { mode: "drawn", view: "270" };
-  if (t < T.headIn + 0.07 || t >= T.headOut) return { mode: "drawn", view: "315" };
-  if (t >= zi && t < zo) return { mode: "full", view: "000" };
+  if (t < T.headIn || t >= T.headOut + TWEEN) return { mode: "drawn", view: "270" };
+  if (t < T.headIn + TWEEN || t >= T.headOut) return { mode: "tween", view: "315" };
+  if (t >= ZI && t < ZO) return { mode: "full", view: "000" };
   return { mode: "full", view: "315" };
+};
+/** Each swap: when, and which way he turns (+1 toward the camera, −1 away). */
+const SWAPS: [number, number][] = [
+  [T.headIn, 1],
+  [ZI, 1],
+  [ZO, -1],
+  [T.headOut, -1],
+];
+/** A turn read as a turn, not a jump: a small dip against the turn before
+ *  the swap, a two-frame smear through it, a settle past it after. */
+const turnAt = (t: number) => {
+  let tilt = 0, nod = 0, smear = 0, sway = 0;
+  for (const [at, dir] of SWAPS) {
+    const d = t - at;
+    // Anticipation: tilt away and dip, 0.2 s before.
+    const ant = interpolate(d, [-0.22, -0.06, 0], [0, 1, 0.4], clamp);
+    tilt -= dir * ant * 3;
+    nod += ant * 2.5;
+    // Smear: a short blur over the swap (through the in-between, on the profile turns).
+    const span = at === T.headIn || at === T.headOut ? TWEEN : 0;
+    smear = Math.max(smear, interpolate(d, [-0.06, span / 2, span + 0.06], [0, 1, 0], clamp));
+    // Settle: a damped overshoot past the new view.
+    if (d > 0) {
+      const k = Math.exp(-d * 7) * Math.sin(d * 2 * Math.PI * 1.8);
+      tilt += dir * k * 4;
+      sway += dir * k;
+    }
+  }
+  return { tilt, nod, smear, sway };
 };
 
 // griff_90's two sleeve fills (upper arm, forearm), painted again over the
@@ -141,8 +178,8 @@ const BEATS: [number, Brows][] = [
   [T.headIn + 0.1, { l: 0, r: 14, tilt: -2, nod: 0 }], // one brow up, he already knows the ending
   [w("sprints"), { l: -2, r: 16, tilt: -3, nod: 2 }],
   [T.zoomIn[1] - 0.15, { l: 0, r: 18, tilt: 2, nod: 0 }],
-  [w("hey") - 0.05, { l: 16, r: 16, tilt: 3, nod: -3 }], // both flash up
-  [w("hey") + 0.25, { l: 4, r: 6, tilt: 2, nod: 0 }],
+  [w("hey") - 0.05, { l: 8, r: 11, tilt: 2, nod: -1 }], // an easy lift, not a flash
+  [w("hey") + 0.3, { l: 2, r: 9, tilt: 1, nod: 0 }], // the beat before his name
   [w("griff") - 0.05, { l: -3, r: 15, tilt: -2, nod: 0 }], // cocky
   [w("might"), { l: 12, r: 12, tilt: 0, nod: 0 }], // the waggle
   [w("might") + 0.17, { l: 0, r: 0, tilt: 0, nod: 0 }],
@@ -172,12 +209,17 @@ export const ProfileShot: React.FC = () => {
   const { W, H, wide } = useSize();
   const { TYPING, THREE_Q, FACE, FACE_EASED } = CAMS[wide ? "wide" : "tall"];
 
+  // Each move starts a little before its view swap, so the swap falls mid move.
   let cam = TYPING;
-  cam = mix(cam, THREE_Q, ramp(t, T.headIn, T.headIn + 0.6) * (1 - ramp(t, T.headOut, T.headOut + 0.6)));
+  cam = mix(cam, THREE_Q, ramp(t, T.headIn - 0.3, T.headIn + 0.45) * (1 - ramp(t, T.headOut - 0.3, T.headOut + 0.45)));
   cam = mix(cam, FACE, ramp(t, T.zoomIn[0], T.zoomIn[1]) * (1 - ramp(t, T.zoomOut[0], T.zoomOut[1])));
   // After "Hey, I'm Griff" the close-up eases back a little, for rhythm.
   const ease = ramp(t, w("griff") + 0.45, w("griff") + 1.25) * (1 - ramp(t, T.zoomOut[0], T.zoomOut[1]));
   cam = mix(cam, FACE_EASED, ease);
+  // Zoom-through from the chat: the cut lands pushed in and settles.
+  const enter = enterK(t, T.chatEnd);
+  cam = { ...cam, s: cam.s * (1 + enter * PUSH) };
+  const turn = turnAt(t);
 
   // Typing while his face is to the screen, at an easy pace.
   const typing = look.mode === "drawn" && look.view === "270";
@@ -188,15 +230,16 @@ export const ProfileShot: React.FC = () => {
     view: look.mode === "full" ? look.view : "270",
     headView: look.view,
     arms: {},
-    head: { tilt: b.tilt + Math.sin(t * 0.8) * 0.6, nod: b.nod + Math.sin(t * 2.1) * 0.8 },
+    head: { tilt: b.tilt + turn.tilt + Math.sin(t * 0.8) * 0.6, nod: b.nod + turn.nod + Math.sin(t * 2.1) * 0.8 },
     face: { mouth: mouthAt(t), brows: { l: b.l, r: b.r }, browShape: { l: { arch: b.l > 8 ? 3 : 1 }, r: { arch: b.r > 8 ? 4 : 1 } } },
   };
 
   const px = (x: number) => (x - (cam.cx - W / 2 / cam.s)) * cam.s;
   const py = (y: number) => (y - (cam.cy - H / 2 / cam.s)) * cam.s;
 
+  const blur = enter * BLUR + turn.smear * 2.5;
   return (
-    <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", filter: blur > 0.05 ? `blur(${blur}px)` : undefined }}>
       <Svg cam={cam}>
         <Room name="back_90" />
         <Layer name="desktop_90" x={0} y={332} />
@@ -232,10 +275,16 @@ export const ProfileShot: React.FC = () => {
           )}
         </g>
         {/* Turned to talk, the chair is behind him. */}
-        {look.mode === "full" && look.view === "315" && <Layer name="chair_90" x={620} y={318} />}
+        {look.mode !== "drawn" && look.view === "315" && <Layer name="chair_90" x={620} y={318} />}
       </Svg>
-      <div style={{ position: "absolute", left: px(RIG.x), top: py(RIG.y), width: RIG.w * cam.s, height: ((RIG.w * STAGE_H) / STAGE_W) * cam.s }}>
-        <Rig pose={pose} id="ep1" only={look.mode === "drawn" ? ["head"] : undefined} />
+      <div style={{ position: "absolute", left: px(RIG.x), top: py(RIG.y), width: RIG.w * cam.s, height: ((RIG.w * STAGE_H) / STAGE_W) * cam.s, transform: look.mode !== "drawn" ? `translateX(${turn.sway * 6 * cam.s}px)` : undefined }}>
+        {look.mode === "tween" ? (
+          <svg viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} width="100%" height="100%" overflow="visible">
+            <g transform={`translate(${STAGE_W / 2} 0) scale(-1 1) translate(${-TWEEN_AX} 0)`} dangerouslySetInnerHTML={{ __html: SVG.griff_070.inner }} />
+          </svg>
+        ) : (
+          <Rig pose={pose} id="ep1" only={look.mode === "drawn" ? ["head"] : undefined} />
+        )}
       </div>
       <Svg cam={cam}>
         {look.mode === "drawn" && <Layer name="chair_90" x={620} y={318} />}

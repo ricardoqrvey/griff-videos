@@ -10,10 +10,10 @@ export const f = (sec: number) => Math.round(sec * FPS);
 
 /** Voice clips: [from, to] in the take, played starting at `at` in the cut. */
 export const VOICE = [
-  { from: 0, to: 2.2, at: 10.3 }, // "Someone say quick dashboard?" (typed in the chat)
-  { from: 2.2, to: 4.95, at: 14.55 }, // "I heard that from three sprints away." (3/4, seated)
-  { from: 4.95, to: 7.75, at: 17.9 }, // "Hey, I'm Griff. I might know a shortcut." (close-up)
-  { from: 7.75, to: 9.95, at: 21.4 }, // "Come see what we're building with GOAT."
+  { from: 0, to: 2.2, at: 6.9 }, // "Someone say quick dashboard?" (typed in the chat)
+  { from: 2.2, to: 5.0, at: 11.15 }, // "I heard that from three sprints away." (3/4, seated)
+  { from: 5.0, to: 7.8, at: 14.66 }, // "Hey… I'm Griff. I might know a shortcut." (close-up; calmer re-take of "Hey… I'm Griff")
+  { from: 7.8, to: 9.98, at: 18.0 }, // "Come see what we're building with GOAT."
 ];
 /** Time in the take for a time in the cut (undefined in the gaps). */
 export const takeTime = (t: number) => {
@@ -39,25 +39,23 @@ export const w = (word: string, nth = 0) =>
 
 export const T = {
   // 1. From behind, typing.
-  chatFrom: 2.6,
-  // 2. The chat, one message at a time.
-  jess: 3.1,
-  mike: 4.9,
-  typeFrom: 6.3,
-  send: 7.5,
-  notify: 9.0,
-  griffTypes: 10.2, // he types his line in the input as he says it, then sends
-  chatEnd: 13.8,
+  chatFrom: 2.0,
+  // 2. The chat: Jess's ask, Mike's "quick dashboard", Griff enters.
+  jess: 2.35,
+  typeFrom: 3.6, // Mike is typing…
+  send: 4.4,
+  notify: 5.7,
+  chatEnd: 10.4,
   // 3. Profile at the desk: he turns his head to the camera (3/4) and talks.
-  headIn: 14.4,
+  headIn: 11.0,
   // 4. Push in to his face, head to the front, brows at work.
-  zoomIn: [17.3, 17.9] as const,
+  zoomIn: [13.9, 14.5] as const,
   // 5. Back out to 3/4 on "Come see…", then back to the keys.
-  zoomOut: [21.55, 22.3] as const,
-  headOut: 23.5,
+  zoomOut: [18.15, 18.9] as const,
+  headOut: 20.1,
   // 6. Blur over the typing, logo and closing line on top.
-  endFrom: 24.0,
-  end: 28.0,
+  endFrom: 20.6,
+  end: 24.6,
 };
 export const EP1_FRAMES = f(T.end);
 /** Griff hits send on "Someone say quick dashboard?" just after saying it. */
