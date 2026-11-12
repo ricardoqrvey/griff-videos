@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 // Cut-out rig built from the Illustrator export (see scripts/rig_from_svg.mjs).
 // Each view is a stack of pieces; arms bend at shoulder, elbow and wrist, and
 // hands can be swapped for any hand in the library.
@@ -436,7 +437,23 @@ function Hand3d({ a, p, flip, id, over }: { a: ArmData; p: Hand3dPose; flip: num
 }
 
 /** `only` limits the drawing to some pieces (e.g. ["head"] to seat the rig's head on a drawn body). */
-export const Rig: React.FC<{ pose: RigPose; id?: string; only?: string[] }> = ({ pose, id = "rig", only }) => {
+/** Recolours what the rig drew, by exact fill: {rig hex: new hex}. Runs after
+ *  every commit, on elements not yet recoloured (markup re-set by React is new). */
+const usePalette = (palette?: Record<string, string>) => {
+  const ref = useRef<SVGSVGElement>(null);
+  useLayoutEffect(() => {
+    if (!palette || !ref.current) return;
+    ref.current.querySelectorAll<SVGElement>("[fill]:not([data-pal])").forEach((el) => {
+      const to = palette[(el.getAttribute("fill") ?? "").toLowerCase()];
+      if (to) el.setAttribute("fill", to);
+      el.setAttribute("data-pal", "");
+    });
+  });
+  return ref;
+};
+
+export const Rig: React.FC<{ pose: RigPose; id?: string; only?: string[]; palette?: Record<string, string> }> = ({ pose, id = "rig", only, palette }) => {
+  const paletteRef = usePalette(palette);
   const { src, mirror } = SOURCE[pose.view];
   const view = RIG.views[src];
   const vt = viewTransform(pose.view);
@@ -755,7 +772,7 @@ export const Rig: React.FC<{ pose: RigPose; id?: string; only?: string[] }> = ({
   const bodyT = `translate(0 ${-(body.lift ?? 0)}) rotate(${body.lean ?? 0} ${view.waist[0]} ${view.waist[1]})`;
 
   return (
-    <svg viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} width="100%" height="100%" overflow="visible">
+    <svg ref={paletteRef} viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} width="100%" height="100%" overflow="visible">
       {view.order
         .filter((name) => !name.startsWith("hand-"))
         .flatMap((name) => (name.startsWith("arm-") ? [`hand-${name.slice(4)}`, name] : [name]))

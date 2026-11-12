@@ -8,9 +8,9 @@ import { WORDMARK } from "./wordmark";
 const io = Easing.bezier(0.76, 0, 0.24, 1);
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
-export const EndFrame: React.FC = () => {
+export const EndFrame: React.FC<{ from?: number; scale?: number }> = ({ from = T.endFrom, scale = 1 }) => {
   const frame = useCurrentFrame();
-  const t = frame / FPS - T.endFrom;
+  const t = frame / FPS - from;
   const k = (a: number, d: number) => interpolate(t, [a, a + d], [0, 1], { ...clamp, easing: io });
   const mark = k(0.1, 0.9), goat = k(0.3, 0.6), iq = k(0.65, 0.5);
   const line = (a: number) => ({ transform: `translateY(${(1 - k(a, 0.6)) * 108}%)`, display: "block" });
@@ -21,7 +21,7 @@ export const EndFrame: React.FC = () => {
     .ep1-wm .wm-iq { transform-box: fill-box; transform-origin: 0% 100%; opacity: ${iq}; transform: translateY(${(1 - iq) * 40}%) scale(${0.7 + iq * 0.3}); }
   `;
   return (
-    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: SANS }}>
+    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: SANS, transform: scale !== 1 ? `scale(${scale})` : undefined }}>
       <style>{css}</style>
       <div className="ep1-wm" style={{ width: 760 }} dangerouslySetInnerHTML={{ __html: WORDMARK }} />
       <div style={{ marginTop: 70, textAlign: "center", font: `800 58px/1.0 ${SANS}`, textTransform: "uppercase", letterSpacing: "-0.01em", color: C.cream }}>
